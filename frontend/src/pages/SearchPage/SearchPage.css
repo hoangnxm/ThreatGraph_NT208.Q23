@@ -1,0 +1,159 @@
+.search-page-wrapper {
+  background-color: #0d1117; 
+  color: #c9d1d9;
+  min-height: 100vh;
+  padding: 30px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* HEADER & SEARCH BAR */
+.search-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.search-title {
+  color: #ffffff;
+}
+
+.search-subtitle {
+  color: #8b949e;
+  margin-bottom: 30px;
+}
+
+.search-input-group {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.search-input {
+  flex: 1;
+  padding: 16px 24px;
+  font-size: 16px;
+  background-color: #161b22;
+  border: 1px solid #30363d;
+  color: #ffffff;
+  border-radius: 8px;
+  outline: none;
+}
+
+.search-input:focus {
+  border-color: #58a6ff;
+  box-shadow: 0 0 10px rgba(88, 166, 255, 0.2);
+}
+
+.btn-search {
+  padding: 0 30px;
+  font-size: 16px;
+  font-weight: 600;
+  background-color: #238636;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn-search:hover { background-color: #2ea043; }
+
+/* KẾT QUẢ */
+.result-container {
+  display: flex;
+  gap: 25px;
+  height: calc(100vh - 200px);
+}
+
+/* CỘT TRÁI (INFO) */
+.info-panel {
+  flex: 3; 
+  background-color: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 25px;
+  display: flex;
+  flex-direction: column;
+  word-break: break-all;
+}
+
+.info-title {
+  color: #58a6ff;
+  margin-bottom: 20px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #21262d;
+}
+
+.info-label {
+  color: #8b949e;
+}
+
+.info-value-large {
+  font-size: 18px;
+}
+
+.info-risk-high {
+  color: #ff7b72;
+  font-size: 20px;
+}
+
+.tags-row {
+  flex-direction: column;
+  align-items: flex-start;
+  border-bottom: none;
+}
+
+.tags-label {
+  margin-bottom: 10px;
+  display: block;
+}
+
+.tag-badge {
+  background-color: #790000;
+  color: #ffa198;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  margin-right: 8px;
+  border: 1px solid #a40e26;
+  display: inline-block;
+  margin-bottom: 5px;
+}
+
+.btn-export {
+  margin-top: auto; 
+  padding: 15px;
+  background-color: #1f6feb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.btn-export:hover { background-color: #388bfd; }
+
+/* CỘT PHẢI (GRAPH) */
+.graph-panel {
+  flex: 7; 
+  background-color: #010409;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8b949e;
+  border: 2px dashed #30363d;
+}
+
+.graph-content {
+  text-align: center;
+}
+
+.graph-title {
+  color: #58a6ff;
+}
