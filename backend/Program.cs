@@ -1,55 +1,79 @@
 using ArangoDBNetStandard;
 using ArangoDBNetStandard.Transport.Http;
+using backend.Repositories;
+using IocNodes.Services;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using NT208_Project.Services;
+using System;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
-
-// Cấu hình để React truy cập được API
-builder.Services.AddCors(options =>
+// ── ArangoDB ────────────────────────────────────────────────────────────────
+builder.Services.AddSingleton<IArangoDBClient>(_ =>
 {
-    options.AddPolicy("AllowReactApp",
-        policy =>
-        {
-            policy.WithOrigins("http://localhost:5173") // Port Vite
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-        });
+    // Đọc chuẩn tên section "ArangoDb" từ appsettings.json
+    var cfg = builder.Configuration.GetSection("ArangoDb");
+
+    var url = cfg["Url"] ?? "http://localhost:8529/";
+    var database = cfg["Database"] ?? "_system";
+    // Đọc chuẩn key "User" từ appsettings.json
+    var username = cfg["User"] ?? "root";
+    var password = cfg["Password"] ?? "";
+
+    var transport = HttpApiTransport.UsingBasicAuth(
+        new Uri(url),
+        database,
+        username,
+        password
+    );
+
+    return new ArangoDBClient(transport);
 });
 
+// ── Application layers ───────────────────────────────────────────────────────
+builder.Services.AddScoped<IIocNodeRepository, IocNodeRepository>();
+builder.Services.AddScoped<IIocNodeService, IocNodeService>();
+// Nhớ thêm using NT208_Project.Services; (hoặc namespace tương ứng chứa file đó) ở trên cùng
+builder.Services.AddHostedService<DatabaseInitializerService>();
 
-// Cấu hình để kết nối ArangoDB
-var arangodUri = builder.Configuration["ArangoDB:Url"];
-var arangoDb = builder.Configuration["ArangoDB:Database"];
-var arangoUser = builder.Configuration["ArangoDB:User"];
-var arangoPassword = builder.Configuration["ArangoDB:Password"];
-
-var transport = HttpApiTransport.UsingBasicAuth(new Uri(arangodUri), arangoDb, arangoUser, arangoPassword);
-
-var arangoClient = new ArangoDBClient(transport);
-// Dùng để cho DB sài chung hệ thống, tối ưu hiệu năng
-builder.Services.AddSingleton<IArangoDBClient>(arangoClient);
-// Kích hoạt tính năng viết API
 builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
-builder.Services.AddHostedService<NT208_Project.Services.DatabaseInitializerService>();
+// Cho Swagger vào để chạy
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Cấu hình Policy để React ping tới
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", builder =>
+    {
+        builder.AllowAnyOrigin()
+               .AllowAnyMethod()
+               .AllowAnyHeader();
+    });
+});
 
 var app = builder.Build();
 
-app.UseCors("AllowReactApp");
-
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
 
+app.UseCors("AllowAll");
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
 app.MapControllers();
-
-
 app.Run();
-
