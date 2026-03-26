@@ -36,6 +36,21 @@ builder.Services.AddControllers();
 
 builder.Services.AddHostedService<NT208_Project.Services.DatabaseInitializerService>();
 
+// Cho Swagger vào để chạy
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Cấu hình Policy để React ping tới
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", builder =>
+    {
+        builder.AllowAnyOrigin()
+               .AllowAnyMethod()
+               .AllowAnyHeader();
+    });
+});
+
 var app = builder.Build();
 
 app.UseCors("AllowReactApp");
@@ -47,6 +62,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.MapControllers();
 

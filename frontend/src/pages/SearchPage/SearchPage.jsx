@@ -11,26 +11,45 @@ function SearchPage(){
   const [isLoading, setIsLoading] = useState(false);
 
   // Xử lí sự kiện click nút tìm
-  const handleSearch = (event) => {
+  const handleSearch = async (event) => {
     event.preventDefault(); // Tránh reload trang khi user bấm tìm
 
     if(searchInput.trim() === '') {return;}
     setIsLoading(true);
+    setSearchResult(null);
     
-    // Dữ liệu giả
-    setTimeout(() => {
-      const mockData = {
-        iocValue: searchInput,
-        type: "IPv4 Address",
-        riskScore: 92,
-        country: "Nga 🇷🇺",
-        asn: "AS12345 (HackerNetwork)",
-        tags: ["Malware C2", "Botnet", "Tor Exit Node"],
+    try{
+      const response = await fetch(`https://localhost:7193/api/Search/${searchInput}`);
+
+      if(!response.ok){
+        if(response.status === 400){
+          alert("Không tìm thấy dấu vết mã độc này trong hệ thống!");
+        }
+        else{
+          alert("Lỗi Server!");
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      const data = await response.json();
+
+      const realData = {
+        iocValue: data.value,
+        type: data.type,
+        riskScore: data.riskScore,
+        country: data.country,
+        asn: data.originRef,
+        tags: data.tags
       };
-      
-      setSearchResult(mockData);
+
+      setSearchResult(realData);
+    } catch(error){
+      alert("Không thể kết nối đến Backend!");
+      console.error(error);
+    } finally{
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
 

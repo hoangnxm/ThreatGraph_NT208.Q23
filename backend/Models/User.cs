@@ -1,4 +1,6 @@
-﻿namespace backend.Models
+﻿using System.Text.Json.Serialization;
+
+namespace backend.Models
 {
     public class User
     {
