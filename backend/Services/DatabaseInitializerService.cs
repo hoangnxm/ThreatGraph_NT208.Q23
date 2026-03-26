@@ -39,12 +39,12 @@ namespace NT208_Project.Services
 
                     logger.LogInformation($"Tạo mới thành công bảng {col.Name}");
                 }
-                catch (ApiErrorException ex) when (ex.ApiError.ErrorNum == 1207) 
+                catch (ApiErrorException ex) when (ex.ApiError.ErrorNum == 1207)
                 {
                     // Mã 1207 là mã báo bảng này đã tồn tại
                     logger.LogInformation($"Bảng {col.Name} đã tồn tại. Bỏ qua!!");
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     logger.LogInformation($"Lỗi khi tạo bảng {col.Name}: {ex.Message}");
                 }
