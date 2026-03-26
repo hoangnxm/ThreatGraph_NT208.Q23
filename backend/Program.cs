@@ -1,6 +1,6 @@
 using ArangoDBNetStandard;
 using ArangoDBNetStandard.Transport.Http;
-using IocNodes.Repositories;
+using backend.Repositories;
 using IocNodes.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -66,7 +66,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-<<<<<<< HEAD
+
+app.UseCors("AllowAll");
 
 if (app.Environment.IsDevelopment())
 {
@@ -74,7 +75,5 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-=======
->>>>>>> origin/KhanhDang
 app.MapControllers();
 app.Run();

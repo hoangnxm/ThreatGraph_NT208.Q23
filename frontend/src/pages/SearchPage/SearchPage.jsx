@@ -22,7 +22,7 @@ function SearchPage(){
       const response = await fetch(`https://localhost:7193/api/Search/${searchInput}`);
 
       if(!response.ok){
-        if(response.status === 400){
+        if(response.status === 404){
           alert("Không tìm thấy dấu vết mã độc này trong hệ thống!");
         }
         else{

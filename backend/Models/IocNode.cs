@@ -1,11 +1,10 @@
 ﻿using System.Text.Json.Serialization;
-namespace backend.Models;
 using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-namespace IocNodes.Models
-{
+namespace backend.Models;
+
     /// <summary>
     /// Represents an Indicator of Compromise node stored in ArangoDB.
     /// _key and CreatedAt are managed by the database / repository layer and are read-only externally.
@@ -37,4 +36,3 @@ namespace IocNodes.Models
         /// <summary>UTC timestamp set on creation.</summary>
         public DateTime CreatedAt { get; set; }
     }
-}

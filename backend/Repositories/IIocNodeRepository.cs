@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using IocNodes.Models;
+using backend.Models;
 
-namespace IocNodes.Repositories
+namespace backend.Repositories
 {
     public interface IIocNodeRepository
     {

@@ -3,9 +3,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using ArangoDBNetStandard;
 using ArangoDBNetStandard.CursorApi.Models;
-using IocNodes.Models;
+using backend.Models;
+using backend.Repositories;
 
-namespace IocNodes.Repositories
+namespace backend.Repositories
 {
     public class IocNodeRepository : IIocNodeRepository
     {
