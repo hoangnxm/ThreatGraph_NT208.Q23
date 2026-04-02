@@ -29,7 +29,7 @@ const Dashboard = () => {
                 
                 {/* Card 1: Tổng User */}
                 <div style={cardStyle}>
-                    <div style={cardIconStyle}>👥</div>
+                    <div style={cardIconStyle}></div>
                     <div>
                         <div style={cardLabelStyle}>TỔNG TÀI KHOẢN</div>
                         <div style={cardValueStyle}>{stats.TotalUsers}</div>
@@ -38,7 +38,7 @@ const Dashboard = () => {
 
                 {/* Card 2: Tổng Logs */}
                 <div style={{ ...cardStyle, borderLeft: '4px solid #ef4444' }}>
-                    <div style={{ ...cardIconStyle, color: '#ef4444', backgroundColor: '#7f1d1d' }}>📜</div>
+                    <div style={{ ...cardIconStyle, color: '#ef4444', backgroundColor: '#7f1d1d' }}></div>
                     <div>
                         <div style={cardLabelStyle}>SỰ KIỆN BẢO MẬT (LOGS)</div>
                         <div style={cardValueStyle}>{stats.TotalLogs}</div>
@@ -46,8 +46,6 @@ const Dashboard = () => {
                 </div>
 
             </div>
-            
-            {/* Vùng trống để tuần sau vẽ biểu đồ */}
             <div style={{ ...cardStyle, marginTop: '20px', height: '300px', display: 'flex', justifyContent: 'center', alignItems: 'center', borderLeft: 'none' }}>
                 <span style={{ color: '#475569' }}>[Khu vực tích hợp Biểu đồ Chart.js (Đang phát triển)]</span>
             </div>

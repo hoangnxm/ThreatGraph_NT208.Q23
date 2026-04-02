@@ -15,26 +15,27 @@ namespace NT208_Project.Middlewares
 
         public async Task InvokeAsync(HttpContext context, IArangoDBClient db)
         {
-            await _next(context); // Chạy request trước
+            await _next(context);
 
-            // Chỉ ghi log nếu là các hành động thay đổi dữ liệu (POST, PUT, DELETE, PATCH)
             var method = context.Request.Method;
             if (method == "POST" || method == "PUT" || method == "DELETE" || method == "PATCH")
             {
-                var username = context.User.FindFirst(ClaimTypes.Name)?.Value ?? "Guest/Unknown";
+                var username = context.User.FindFirst(ClaimTypes.Name)?.Value ?? "System";
                 var path = context.Request.Path;
+                
+                // Bắt IP thật
                 var ip = context.Connection.RemoteIpAddress?.ToString() ?? "Unknown IP";
+                
+                if (ip == "::1") ip = "127.0.0.1";
 
                 var logEntry = new {
                     Timestamp = DateTime.UtcNow,
                     Action = method,
                     Resource = path,
-                    User = username,
-                    IPAddress = ip,
+                    Username = username,    
+                    ClientIp = ip,      
                     StatusCode = context.Response.StatusCode
                 };
-
-                // Lưu vào Collection AuditLogs
                 try {
                     await db.Cursor.PostCursorAsync<object>(new PostCursorBody {
                         Query = "INSERT @log INTO AuditLogs",
