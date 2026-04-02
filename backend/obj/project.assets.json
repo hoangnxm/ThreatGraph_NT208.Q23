@@ -2782,23 +2782,23 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\H2OK\\.nuget\\packages\\": {},
+    "C:\\Users\\Admin\\.nuget\\packages\\": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\H2OK\\UIT\\Documents\\GitHub\\ThreatGraph_NT208.Q23\\backend\\backend.csproj",
+      "projectUniqueName": "E:\\NT208_Project\\backend\\backend.csproj",
       "projectName": "backend",
-      "projectPath": "C:\\Users\\H2OK\\UIT\\Documents\\GitHub\\ThreatGraph_NT208.Q23\\backend\\backend.csproj",
-      "packagesPath": "C:\\Users\\H2OK\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\H2OK\\UIT\\Documents\\GitHub\\ThreatGraph_NT208.Q23\\backend\\obj\\",
+      "projectPath": "E:\\NT208_Project\\backend\\backend.csproj",
+      "packagesPath": "C:\\Users\\Admin\\.nuget\\packages\\",
+      "outputPath": "E:\\NT208_Project\\backend\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
       ],
       "configFilePaths": [
-        "C:\\Users\\H2OK\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Users\\Admin\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],

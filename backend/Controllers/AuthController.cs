@@ -35,17 +35,22 @@ namespace NT208_Project.Controllers
 
                 var user = cursor.Result.FirstOrDefault();
 
+                if (user == null)
+                {
+                    return StatusCode(401, new { message = "Sai tài khoản hoặc mật khẩu!" });
+                }
+
                 // Check mật khẩu (Đồ án đang để thô chưa hash thì dùng ==)
                 // Nếu user null hoặc sai pass -> Đuổi!
                 // Lấy password từ DB ra
-            string dbPassword = (string)user.password ?? "";
+                string dbPassword = (string)user.password ?? "";
             // DÙNG BCRYPT ĐỂ GIẢI MÃ VÀ SO SÁNH
-            if (user == null || !BCrypt.Net.BCrypt.Verify(req.Password, dbPassword))
+            if (!BCrypt.Net.BCrypt.Verify(req.Password, dbPassword))
             {
                  return StatusCode(401, new { message = "Sai tài khoản hoặc mật khẩu!" });
                  }
 
-                if (user.isLocked == true) return StatusCode(403, new { message = "Tài khoản đang bị khóa mõm!" });
+                if (user.isLocked == true) return StatusCode(403, new { message = "Tài khoản đang bị khóa !" });
 
                 // Lấy Role từ DB (nếu không có thì mặc định cho làm Admin để test)
                 string role = user.role ?? "Admin";
@@ -61,10 +66,10 @@ namespace NT208_Project.Controllers
 
                 return Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token), role = role });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Nếu ArangoDB chưa có bảng Users nó sẽ văng lỗi vào đây
-                return StatusCode(500, new { message = "Chưa tạo Collection 'Users' trong ArangoDB kìa ông thần!" });
+                // Báo lỗi
+                return StatusCode(500, new { message = $"Lỗi hệ thống: {ex.Message}" });
             }
         }
     }

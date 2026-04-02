@@ -24,23 +24,32 @@ namespace NT208_Project.Controllers
         {
             try
             {
-                // Truy vấn
+                // Phân biệt IP, Domain, Hash
+                string Type = "Unknown";
+                if (System.Text.RegularExpressions.Regex.IsMatch(keyword, @"^(\d{1,3}\.){3}\d{1,3}$"))
+                    Type = "IP";
+                else if (keyword.Contains(".") && keyword.Length > 3)
+                    Type = "Domain";
+                else if (keyword.Length == 32 || keyword.Length == 64)
+                    Type = "Hash";
+
+                // Truy Vấn
                 string Querry = @"
                     FOR node IN IocNodes
-                    FILTER node.Value == @keyword OR LIKE(node.Value, CONCAT('%', @keyword, '%'), true)
+                    FILTER node.Value == @keyword
+                    OR LIKE(node.Value, CONCAT('%', @keyword, '%'),true)
+                    SORT node.RiskScore DESC
                     LIMIT 1
                     RETURN node
                 ";
 
-                // Chống AQL Injection
                 var bindVars = new Dictionary<string, object>
                 {
                     { "keyword", keyword }
                 };
 
-                // Gửi lệnh qua ArangoDB
                 var response = await dbClient.Cursor.PostCursorAsync<IocNode>(
-                    new PostCursorBody 
+                    new PostCursorBody
                     {
                         Query = Querry,
                         BindVars = bindVars
@@ -49,15 +58,13 @@ namespace NT208_Project.Controllers
 
                 var result = response.Result.FirstOrDefault();
 
-                // Nếu khôngg có
-                if (result == null)
+                if(result == null)
                 {
-                    return NotFound(new { message = "Không tìm thấy dấu vết mã độc!!" });
+                    return NotFound(new { message = "Không tìm thấy dấu vết mã độc!" });
                 }
 
                 return Ok(result);
-            }
-            catch(Exception ex)
+            }catch(Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi hệ thống khi tra cứu", error = ex.Message });
             }

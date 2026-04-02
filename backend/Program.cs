@@ -23,6 +23,8 @@ var arangoPassword = builder.Configuration["ArangoDB:Password"];
 var transport = HttpApiTransport.UsingBasicAuth(new Uri(arangodUri), arangoDb, arangoUser, arangoPassword);
 builder.Services.AddSingleton<IArangoDBClient>(new ArangoDBClient(transport));
 
+builder.Services.AddHostedService<NT208_Project.Services.DatabaseInitializerService>();
+
 // 3. Cấu hình JWT Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options => {
