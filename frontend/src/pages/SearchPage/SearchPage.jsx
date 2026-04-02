@@ -3,45 +3,54 @@ import ForceGraph2D from 'react-force-graph-2d';
 import './SearchPage.css';
 
 function SearchPage(){
+
+  // Lưu chữ user đang nhập
   const [searchInput, setSearchInput] = useState('');
+  // Kết quả sau khi user bấm tìm kiếm
   const [searchResult, setSearchResult] = useState(null);
+  // Trạng thái nút bấm
   const [isLoading, setIsLoading] = useState(false);
+  // Data đồ thị của nhánh master
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
 
+  // Xử lí sự kiện click nút tìm
   const handleSearch = async (event) => {
-    event.preventDefault(); 
+    event.preventDefault(); // Tránh reload trang khi user bấm tìm
+
     if(searchInput.trim() === '') {return;}
-    
     setIsLoading(true);
     setSearchResult(null);
     setGraphData({ nodes: [], links: [] });
     
     try{
-      const textResponse = await fetch(`https://localhost:7193/api/Search/${searchInput}`);
+      const response = await fetch(`https://localhost:7193/api/Search/${searchInput}`);
 
-      if(!textResponse.ok){
-        if(textResponse.status === 404){
+      if(!response.ok){
+        if(response.status === 404){
           alert("Không tìm thấy dấu vết mã độc này trong hệ thống!");
-        } else {
-          alert("Lỗi Server Backend!");
+        }
+        else{
+          alert("Lỗi Server!");
         }
         setIsLoading(false);
         return;
       }
 
-      const textData = await textResponse.json();
+      const data = await response.json();
 
-      // Hứng data Text (chấp mọi thể loại viết hoa/thường)
-      setSearchResult({
-        iocValue: textData.value || textData.Value,
-        type: textData.type || textData.Type,
-        riskScore: textData.riskScore || textData.RiskScore,
-        country: textData.country || textData.Country || "Unknown",
-        asn: textData.originRef || textData.OriginRef || "N/A",
-        tags: textData.tags || textData.Tags || []
-      });
+      const realData = {
+        iocValue: data.value || data.Value,
+        type: data.type || data.Type,
+        riskScore: data.riskScore || data.RiskScore,
+        country: data.country || data.Country || "Unknown",
+        asn: data.originRef || data.OriginRef || "N/A",
+        tags: data.tags || data.Tags || []
+      };
 
-      const searchKey = textData._key || textData.Key || textData.key;
+      setSearchResult(realData);
+
+      // Lấy key để gọi tiếp API Graph của Hưng
+      const searchKey = data._key || data.Key || data.key;
 
       if (searchKey) {
         const graphResponse = await fetch(`https://localhost:7193/api/Graph/${searchKey}`);
@@ -96,8 +105,11 @@ function SearchPage(){
     }
   };
 
+
+  // Giao diện
   return (
     <div className="search-page-wrapper">
+      
       <div className="search-header">
         <h1 className="search-title">Tra cứu Dấu vết Tấn công (IOC)</h1>
         <p className="search-subtitle">Hệ thống phân tích thông minh</p>
@@ -121,22 +133,27 @@ function SearchPage(){
           
           <div className="info-panel">
             <h2 className="info-title">Chi tiết IOC</h2>
+            
             <div className="info-row">
               <span className="info-label">Giá trị:</span>
               <strong className="info-value-large">{searchResult.iocValue}</strong>
             </div>
+            
             <div className="info-row">
               <span className="info-label">Loại:</span>
               <span>{searchResult.type}</span>
             </div>
+            
             <div className="info-row">
               <span className="info-label">Điểm Rủi ro:</span>
               <strong className="info-risk-high">{searchResult.riskScore} / 100</strong>
             </div>
+
             <div className="info-row">
               <span className="info-label">Quốc gia & Mạng:</span>
               <span>{searchResult.country} - {searchResult.asn}</span>
             </div>
+
             <div className="info-row tags-row">
               <span className="info-label tags-label">Nhãn dán (Tags):</span>
               <div>
@@ -145,6 +162,7 @@ function SearchPage(){
                 ))}
               </div>
             </div>
+
             <button className="btn-export" onClick={() => alert("Chức năng tải PDF đang được phát triển!")}>
               📄 Xuất Báo Cáo (PDF)
             </button>
