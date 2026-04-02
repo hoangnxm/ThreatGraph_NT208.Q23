@@ -1,5 +1,6 @@
 ﻿using ArangoDBNetStandard;
 using ArangoDBNetStandard.CollectionApi.Models;
+using ArangoDBNetStandard.CursorApi.Models;
 using System.Reflection.Metadata;
 
 namespace NT208_Project.Services
@@ -14,6 +15,38 @@ namespace NT208_Project.Services
             dbClient = DbClient;
             logger = Logger;
         }
+
+        private async Task SeedAdminUserAsync()
+        {
+            try
+            {
+                // Kiểm tra database đã có Admin chưa
+                var cursor = await dbClient.Cursor.PostCursorAsync<dynamic>(new PostCursorBody
+                {
+                    Query = "FOR u IN Users FILTER u.username == 'admin' RETURN u"
+                });
+
+                if (!cursor.Result.Any())
+                {
+                    logger.LogInformation("Đang tạo tài khoản Admin mặc định...");
+                    // Băm pass
+                    string hashedPassword = BCrypt.Net.BCrypt.HashPassword("admin123");
+                    // Lưu vào DB
+                    await dbClient.Cursor.PostCursorAsync<dynamic>(new PostCursorBody
+                    {
+                        Query = "INSERT { username: 'admin', password: @pass, role: 'Admin', isLocked: false} INTO Users",
+                        BindVars = new Dictionary<string, object> { { "pass", hashedPassword } }
+                    });
+                    logger.LogInformation("Tạo tài khoản thành công!");
+                }
+            }
+            catch (Exception ex)
+            {
+
+                logger.LogError($"Lỗi khi tạo User: {ex.Message}");
+            }
+        }
+
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
@@ -49,6 +82,9 @@ namespace NT208_Project.Services
                     logger.LogInformation($"Lỗi khi tạo bảng {col.Name}: {ex.Message}");
                 }
             }
+
+            await SeedAdminUserAsync();
+
             logger.LogInformation("HOÀN TẤT SETUP DATABASE!");
         }
 
