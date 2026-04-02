@@ -1,9 +1,0 @@
-D:\NT208\NT208_DoAn\backend\obj\Debug\net10.0\backend.csproj.AssemblyReference.cache
-D:\NT208\NT208_DoAn\backend\obj\Debug\net10.0\rpswa.dswa.cache.json
-D:\NT208\NT208_DoAn\backend\obj\Debug\net10.0\backend.GeneratedMSBuildEditorConfig.editorconfig
-D:\NT208\NT208_DoAn\backend\obj\Debug\net10.0\backend.AssemblyInfoInputs.cache
-D:\NT208\NT208_DoAn\backend\obj\Debug\net10.0\backend.AssemblyInfo.cs
-D:\NT208\NT208_DoAn\backend\obj\Debug\net10.0\backend.csproj.CoreCompileInputs.cache
-D:\NT208\NT208_DoAn\backend\obj\Debug\net10.0\backend.MvcApplicationPartsAssemblyInfo.cs
-D:\NT208\NT208_DoAn\backend\obj\Debug\net10.0\backend.MvcApplicationPartsAssemblyInfo.cache
-D:\NT208\NT208_DoAn\backend\obj\Debug\net10.0\backend.sourcelink.json
