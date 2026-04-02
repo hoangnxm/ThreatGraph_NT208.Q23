@@ -12,7 +12,7 @@ namespace backend.Models;
     public class IocNode
     {
         /// <summary>ArangoDB document key (_key). Assigned on insert.</summary>
-        [JsonProperty("_key")]
+        [JsonProperty("_key")] 
         public string? Key { get; set; }
 
         /// <summary>IOC type: "IP" | "Domain" | "Hash"</summary>
