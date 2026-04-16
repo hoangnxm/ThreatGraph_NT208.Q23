@@ -30,12 +30,28 @@ namespace IocNodes.Services
             return nodes.Select(MapToResponse);
         }
 
+        public async Task<PagedResult<IocNodeResponse>> GetAllPagedAsync(int offset, int limit, string? type = null, string? keyword = null)
+        {
+            // 1. Lấy danh sách items đã được lọc và phân trang từ DB
+            var nodes = await _repository.GetAllAsync(offset, limit, type, keyword);
+
+            // 2. Lấy tổng số lượng bản ghi THỰC TẾ sau khi lọc để vẽ thanh phân trang
+            var totalCount = await _repository.GetCountAsync(type, keyword);
+
+            return new PagedResult<IocNodeResponse>
+            {
+                Items = nodes.Select(MapToResponse),
+                TotalCount = totalCount,
+                Page = (offset / limit) + 1,
+                Limit = limit
+            };
+        }
         public async Task<IocNodeResponse> CreateAsync(CreateIocNodeRequest request)
         {
             var node = new IocNode
             {
                 Type = request.Type,
-                Value = request.Value,
+                Value = request.Value.Trim(),
                 RiskScore = request.RiskScore,
                 Country = request.Country,
                 Tags = request.Tags ?? new List<string>(),

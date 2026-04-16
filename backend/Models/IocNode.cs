@@ -11,12 +11,12 @@ namespace backend.Models;
     /// </summary>
     public class IocNode
     {
-        /// <summary>ArangoDB document key (_key). Assigned on insert.</summary>
-        [JsonProperty("_key")]
-        public string? Key { get; set; }
+    /// <summary>ArangoDB document key (_key). Assigned on insert.</summary>
+    [JsonProperty("_key", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Key { get; set; }
 
-        /// <summary>IOC type: "IP" | "Domain" | "Hash"</summary>
-        public string Type { get; set; } = string.Empty;
+    /// <summary>IOC type: "IP" | "Domain" | "Hash"</summary>
+    public string Type { get; set; } = string.Empty;
 
         /// <summary>Normalised (lowercase, trimmed) indicator value.</summary>
         public string Value { get; set; } = string.Empty;
