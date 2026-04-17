@@ -7,9 +7,10 @@ namespace backend.Repositories
     public interface IIocNodeRepository
     {
         Task<IocNode?> GetByIdAsync(string key);
-        Task<IEnumerable<IocNode>> GetAllAsync(int offset, int limit);
+        Task<IEnumerable<IocNode>> GetAllAsync(int offset, int limit, string? type = null, string? keyword = null);
         Task<IocNode> CreateAsync(IocNode node);
         Task<IocNode?> UpdateAsync(string key, IocNode node);
+        Task<int> GetCountAsync(string? type = null, string? keyword = null);
         Task<bool> DeleteAsync(string key);
     }
 }

@@ -5,6 +5,8 @@ import Dashboard from './pages/Dashboard';
 import UsersManagement from './pages/UsersManagement';
 import AuditLogList from './pages/AuditLogList';
 import SearchPage from './pages/SearchPage/SearchPage';
+import IocManagement from './pages/IocManagement';
+import DataFeeds from './pages/DataFeeds';
 
 function App() {
   const token = localStorage.getItem('token');
@@ -19,7 +21,8 @@ function App() {
         <Route path="/" element={token ? <MainLayout /> : <Navigate to="/login" />}>
           <Route index element={<Dashboard />} />
           <Route path='search' element={<SearchPage/>}/>
-          <Route path="database" element={<Dashboard />} />
+          <Route path="database" element={<IocManagement/>} />
+         
 
           {/* Các chức năng dành cho Admin */}
           <Route 
@@ -34,7 +37,7 @@ function App() {
 
           <Route 
           path="feeds" 
-          element={role === 'Admin' ? <Dashboard /> :  <Navigate to='/'/>} 
+          element={role === 'Admin' ? <DataFeeds /> :  <Navigate to='/'/>} 
           />
         </Route>
       </Routes>

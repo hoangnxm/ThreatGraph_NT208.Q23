@@ -34,20 +34,37 @@ namespace backend.Repositories
             return result.Result.FirstOrDefault();
         }
 
-        public async Task<IEnumerable<IocNode>> GetAllAsync(int offset, int limit)
+        public async Task<IEnumerable<IocNode>> GetAllAsync(int offset, int limit, string? type = null, string? keyword = null)
         {
-            var query = @"
-                FOR i IN @@collection
-                SORT i.CreatedAt DESC
-                LIMIT @offset, @limit
-                RETURN i";
-
+            var filterAql = "";
             var bindVars = new Dictionary<string, object>
             {
                 { "@collection", CollectionName },
                 { "offset", offset },
                 { "limit", limit }
             };
+
+            // Lọc theo loại (IP, Domain, Hash)
+            if (!string.IsNullOrEmpty(type))
+            {
+                filterAql += " FILTER i.Type == @type ";
+                bindVars.Add("type", type);
+            }
+
+            // Lọc theo từ khóa tìm kiếm (Value)
+            if (!string.IsNullOrEmpty(keyword))
+            {
+                var prefix = string.IsNullOrEmpty(type) ? "FILTER" : "AND";
+                filterAql += $" {prefix} CONTAINS(LOWER(i.Value), LOWER(@keyword)) ";
+                bindVars.Add("keyword", keyword);
+            }
+
+            var query = $@"
+                FOR i IN @@collection
+                {filterAql}
+                SORT i.CreatedAt DESC
+                LIMIT @offset, @limit
+                RETURN i";
 
             var response = await _dbClient.Cursor.PostCursorAsync<IocNode>(
                 new PostCursorBody { Query = query, BindVars = bindVars }
@@ -99,6 +116,40 @@ namespace backend.Repositories
             {
                 return null;
             }
+        }
+        public async Task<int> GetCountAsync(string? type = null, string? keyword = null)
+        {
+            var filterAql = "";
+            var bindVars = new Dictionary<string, object>
+            {
+                { "@collection", CollectionName }
+            };
+
+            if (!string.IsNullOrEmpty(type))
+            {
+                filterAql += " FILTER i.Type == @type ";
+                bindVars.Add("type", type);
+            }
+
+            if (!string.IsNullOrEmpty(keyword))
+            {
+                var prefix = string.IsNullOrEmpty(type) ? "FILTER" : "AND";
+                filterAql += $" {prefix} CONTAINS(LOWER(i.Value), LOWER(@keyword)) ";
+                bindVars.Add("keyword", keyword);
+            }
+
+            // Dùng COUNT thay vì LENGTH(@@collection) để đếm đúng số lượng sau khi Filter
+            var query = $@"
+                FOR i IN @@collection
+                {filterAql}
+                COLLECT WITH COUNT INTO length
+                RETURN length";
+
+            var response = await _dbClient.Cursor.PostCursorAsync<int>(
+                new PostCursorBody { Query = query, BindVars = bindVars }
+            );
+
+            return response.Result.First();
         }
 
         public async Task<bool> DeleteAsync(string key)

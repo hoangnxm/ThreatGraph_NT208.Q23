@@ -5,6 +5,8 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using NT208_Project.Middlewares;
 using Microsoft.OpenApi.Models;
+using IocNodes.Services;
+using backend.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -71,6 +73,32 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 builder.Services.AddControllers();
+// Đăng ký Repository để Controller có thể gọi xuống Database
+builder.Services.AddScoped<IIocNodeRepository, IocNodeRepository>();
+
+// Đăng ký Service để xử lý logic cho IOC
+builder.Services.AddScoped<IIocNodeService, IocNodeService>();
+
+// Đăng ký HttpClient chuyên dụng cho AlienVault
+builder.Services.AddHttpClient("AlienVaultClient", client =>
+{
+    var baseUrl = builder.Configuration["AlienVault:BaseUrl"];
+    var apiKey = builder.Configuration["AlienVault:ApiKey"];
+
+    if (!string.IsNullOrEmpty(baseUrl))
+    {
+        client.BaseAddress = new Uri(baseUrl);
+    }
+
+    // Gắn API Key vào Header cho TẤT CẢ các request đi từ Client này
+    if (!string.IsNullOrEmpty(apiKey))
+    {
+        client.DefaultRequestHeaders.Add("X-OTX-API-KEY", apiKey);
+    }
+});
+
+// Đăng ký Service cào dữ liệu
+builder.Services.AddScoped<IDataFeedService, DataFeedService>();
 var app = builder.Build();
 
 

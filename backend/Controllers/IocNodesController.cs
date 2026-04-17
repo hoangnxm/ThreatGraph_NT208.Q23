@@ -67,5 +67,14 @@ namespace IocNodes.Controllers
             // Xóa thành công thì trả về HTTP 204 No Content là chuẩn bài RESTful nhất
             return NoContent(); 
         }
+
+        
+        // GET: api/iocnodes/paged?offset=0&limit=50&type=IP&keyword=103
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetAllPaged([FromQuery] int offset = 0, [FromQuery] int limit = 50, [FromQuery] string? type = null, [FromQuery] string? keyword = null)
+        {
+            var result = await _service.GetAllPagedAsync(offset, limit, type, keyword);
+            return Ok(result);
+        }
     }
 }
