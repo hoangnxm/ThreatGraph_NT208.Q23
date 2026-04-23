@@ -68,6 +68,7 @@ namespace IocNodes.Services
             var existingNode = await _repository.GetByIdAsync(id);
             if (existingNode == null) return null;
 
+            // ĐÈ THẲNG RỦI RO MỚI NHẤT TỪ NGUỒN (Bỏ cái trò giữ Max đi)
             if (request.RiskScore.HasValue) 
                 existingNode.RiskScore = request.RiskScore.Value;
             
@@ -75,12 +76,20 @@ namespace IocNodes.Services
                 existingNode.Country = request.Country;
             
             if (request.Tags != null) 
-                existingNode.Tags = request.Tags;
+            {
+                // Gộp Tag cũ và Tag mới, loại bỏ cái trùng lặp
+                existingNode.Tags = existingNode.Tags.Concat(request.Tags).Distinct().ToList();
+            }
+
+            if (request.OriginRef != null)
+                existingNode.OriginRef = request.OriginRef;
+
+            // CHỐT THỜI GIAN CẬP NHẬT MỚI NHẤT
+            existingNode.UpdatedAt = DateTime.UtcNow;
 
             var updatedNode = await _repository.UpdateAsync(id, existingNode);
             return updatedNode != null ? MapToResponse(updatedNode) : null;
         }
-
         public async Task<bool> DeleteAsync(string id)
         {
             return await _repository.DeleteAsync(id);
@@ -97,7 +106,8 @@ namespace IocNodes.Services
                 Country = node.Country,
                 Tags = node.Tags ?? new List<string>(),
                 OriginRef = node.OriginRef,
-                CreatedAt = node.CreatedAt
+                CreatedAt = node.CreatedAt,
+                UpdatedAt = node.UpdatedAt // Map thêm trường này
             };
         }
     }

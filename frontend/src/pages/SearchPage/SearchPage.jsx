@@ -1,24 +1,24 @@
-import React, {useState} from 'react';
+import React, { useState } from 'react';
+import ForceGraph2D from 'react-force-graph-2d'; // Đã thêm thư viện vẽ Graph
 import './SearchPage.css';
 
 function SearchPage(){
 
-  // Lưu chữ user đang nhập
   const [searchInput, setSearchInput] = useState('');
-  // Kết quả sau khi user bấm tìm kiếm
   const [searchResult, setSearchResult] = useState(false);
-  // Trạng thái nút bấm
+  const [graphData, setGraphData] = useState(null); // Thêm state lưu dữ liệu Graph
   const [isLoading, setIsLoading] = useState(false);
 
-  // Xử lí sự kiện click nút tìm
   const handleSearch = async (event) => {
-    event.preventDefault(); // Tránh reload trang khi user bấm tìm
+    event.preventDefault(); 
 
     if(searchInput.trim() === '') {return;}
     setIsLoading(true);
     setSearchResult(null);
+    setGraphData(null); // Reset Graph khi quét mã mới
     
     try{
+      // 1. Quét dữ liệu chi tiết IOC
       const response = await fetch(`https://localhost:7193/api/Search/${searchInput}`);
 
       if(!response.ok){
@@ -44,6 +44,18 @@ function SearchPage(){
       };
 
       setSearchResult(realData);
+
+      // 2. Tự động gọi API quét dữ liệu Mạng nhện (Graph)
+      try {
+        const graphResponse = await fetch(`https://localhost:7193/api/Graph/${data.id}`);
+        if (graphResponse.ok) {
+          const gData = await graphResponse.json();
+          setGraphData(gData);
+        }
+      } catch (graphError) {
+        console.error("Lỗi khi kéo dữ liệu Graph:", graphError);
+      }
+
     } catch(error){
       alert("Không thể kết nối đến Backend!");
       console.error(error);
@@ -52,11 +64,8 @@ function SearchPage(){
     }
   };
 
-
-  // Giao diện
   return (
     <div className="search-page-wrapper">
-      
       <div className="search-header">
         <h1 className="search-title">Tra cứu Dấu vết Tấn công (IOC)</h1>
         <p className="search-subtitle">Hệ thống phân tích thông minh</p>
@@ -80,27 +89,22 @@ function SearchPage(){
           
           <div className="info-panel">
             <h2 className="info-title">Chi tiết IOC</h2>
-            
             <div className="info-row">
               <span className="info-label">Giá trị:</span>
               <strong className="info-value-large">{searchResult.iocValue}</strong>
             </div>
-            
             <div className="info-row">
               <span className="info-label">Loại:</span>
               <span>{searchResult.type}</span>
             </div>
-            
             <div className="info-row">
               <span className="info-label">Điểm Rủi ro:</span>
               <strong className="info-risk-high">{searchResult.riskScore} / 100</strong>
             </div>
-
             <div className="info-row">
               <span className="info-label">Quốc gia & Mạng:</span>
               <span>{searchResult.country} - {searchResult.asn}</span>
             </div>
-
             <div className="info-row tags-row">
               <span className="info-label tags-label">Nhãn dán (Tags):</span>
               <div>
@@ -109,7 +113,6 @@ function SearchPage(){
                 ))}
               </div>
             </div>
-
             <button className="btn-export" onClick={() => alert("Chức năng tải PDF đang được phát triển!")}>
               📄 Xuất Báo Cáo (PDF)
             </button>
@@ -118,9 +121,28 @@ function SearchPage(){
           <div className="graph-panel">
             <div className="graph-content">
               <h3 className="graph-title">🕸️ Khu vực Mạng nhện (Graph)</h3>
+              
+              {/* Khu vực render Component biểu đồ */}
+              <div style={{ height: '400px', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                {graphData && graphData.nodes && graphData.nodes.length > 0 ? (
+                  <ForceGraph2D
+                    graphData={graphData}
+                    nodeLabel={(node) => `${node.name} (${node.type})`} // Tên hiển thị khi trỏ chuột
+                    nodeColor={(node) => node.color} 
+                    nodeVal={(node) => node.val}     
+                    linkColor={() => '#94a3b8'}      // Màu liên kết
+                    width={550}                      // Chỉnh lại width cho vừa flex box
+                    height={400}
+                    linkDirectionalArrowLength={3.5} // Mũi tên chỉ hướng quan hệ
+                    linkDirectionalArrowRelPos={1}
+                  />
+                ) : (
+                  <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Chưa có dữ liệu liên kết cho IOC này.</p>
+                )}
+              </div>
+
             </div>
           </div>
-
         </div>
       )}
     </div>

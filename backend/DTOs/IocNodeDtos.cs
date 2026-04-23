@@ -41,6 +41,8 @@ namespace IocNodes.DTOs
         public string? Country { get; set; }
 
         public List<string>? Tags { get; set; }
+
+        public string? OriginRef { get; set; }
     }
 
     // ---------------------------------------------------------------------------
@@ -58,6 +60,8 @@ namespace IocNodes.DTOs
         public List<string> Tags { get; set; } = new();
         public string OriginRef { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
+
+        public DateTime? UpdatedAt { get; set; }
     }
 
     // ---------------------------------------------------------------------------
