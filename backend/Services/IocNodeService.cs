@@ -24,6 +24,18 @@ namespace IocNodes.Services
             return MapToResponse(node);
         }
 
+        public async Task<IocNodeResponse?> GetByValueAsync(string value)
+        {
+            // Gọi xuống Repository để truy vấn DB
+            var node = await _repository.GetByValueAsync(value);
+
+            // Nếu không tìm thấy thì trả về null
+            if (node == null) return null;
+
+            // Nếu tìm thấy, chuyển đổi Model thành DTO (IocNodeResponse)
+            return MapToResponse(node);
+        }
+
         public async Task<IEnumerable<IocNodeResponse>> GetAllAsync(int offset, int limit)
         {
             var nodes = await _repository.GetAllAsync(offset, limit);
@@ -95,6 +107,8 @@ namespace IocNodes.Services
             return await _repository.DeleteAsync(id);
         }
 
+
+
         private IocNodeResponse MapToResponse(IocNode node)
         {
             return new IocNodeResponse
@@ -109,6 +123,31 @@ namespace IocNodes.Services
                 CreatedAt = node.CreatedAt,
                 UpdatedAt = node.UpdatedAt // Map thêm trường này
             };
+        }
+
+        public async Task<bool> CreateRelationshipAsync(CreateRelationshipRequest request)
+        {
+            // 1. Đi tìm Node nguồn (Từ IP/Domain user nhập)
+            var fromNode = await _repository.GetByValueAsync(request.FromValue.Trim());
+            if (fromNode == null || string.IsNullOrEmpty(fromNode.Key))
+            {
+                throw new Exception($"Không tìm thấy Node nguồn với giá trị: {request.FromValue}. Vui lòng thêm IOC này vào hệ thống trước.");
+            }
+
+            // 2. Đi tìm Node đích (Từ IP/Domain user nhập)
+            var toNode = await _repository.GetByValueAsync(request.ToValue.Trim());
+            if (toNode == null || string.IsNullOrEmpty(toNode.Key))
+            {
+                throw new Exception($"Không tìm thấy Node đích với giá trị: {request.ToValue}. Vui lòng thêm IOC này vào hệ thống trước.");
+            }
+
+            // 3. Đã có đủ 2 Key, tiến hành nối như bình thường
+            return await _repository.CreateRelationshipAsync(
+                fromNode.Key,
+                toNode.Key,
+                request.RelationType,
+                "Manual"
+            );
         }
     }
 }

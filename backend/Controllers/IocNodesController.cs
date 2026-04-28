@@ -39,10 +39,51 @@ namespace IocNodes.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
+            // 1. KIỂM TRA TRÙNG LẶP TRƯỚC KHI TẠO
+            // Gọi xuống Service để tìm xem Value này đã có trong Database chưa
+            var existingNode = await _service.GetByValueAsync(request.Value);
+
+            if (existingNode != null)
+            {
+                // Nếu đã tồn tại, trả về lỗi 409 Conflict cùng với thông tin của Node cũ
+                return StatusCode(409, new
+                {
+                    message = $"Node '{request.Value}' đã tồn tại trong hệ thống!",
+                    source = existingNode.OriginRef,
+                    existingKey = existingNode.Id // Hoặc existingNode.Key tùy thuộc vào model trả về của bạn
+                });
+            }
+
+            // 2. NẾU CHƯA CÓ THÌ TIẾN HÀNH TẠO MỚI
             var result = await _service.CreateAsync(request);
-            
+
             // Trả về HTTP 201 Created kèm header Location trỏ tới URL của resource vừa tạo
             return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+        }
+
+        // POST: api/iocnodes/relationship
+        [HttpPost("relationship")]
+        public async Task<IActionResult> CreateRelationship([FromBody] CreateRelationshipRequest request)
+        {
+            // Kiểm tra xem Frontend có gửi thiếu trường nào trong DTO không
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            try
+            {
+                var success = await _service.CreateRelationshipAsync(request);
+
+                if (success)
+                {
+                    return Ok(new { message = "Tạo liên kết thành công!" });
+                }
+
+                return BadRequest(new { message = "Không thể tạo liên kết. Vui lòng kiểm tra lại Key của 2 Node." });
+            }
+            catch (System.Exception ex)
+            {
+                // Nếu ArangoDB báo lỗi (ví dụ: Key không tồn tại trong DB), sẽ bắt ở đây
+                return StatusCode(500, new { message = $"Lỗi hệ thống: {ex.Message}" });
+            }
         }
 
         // PUT: api/iocnodes/{id}

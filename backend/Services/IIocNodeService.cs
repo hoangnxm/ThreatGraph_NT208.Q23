@@ -7,10 +7,16 @@ namespace IocNodes.Services
     public interface IIocNodeService
     {
         Task<IocNodeResponse?> GetByIdAsync(string id);
+
         Task<IEnumerable<IocNodeResponse>> GetAllAsync(int offset, int limit);
         Task<IocNodeResponse> CreateAsync(CreateIocNodeRequest request);
         Task<IocNodeResponse?> UpdateAsync(string id, UpdateIocNodeRequest request);
         Task<PagedResult<IocNodeResponse>> GetAllPagedAsync(int offset, int limit, string? type = null, string? keyword = null);
         Task<bool> DeleteAsync(string id);
+
+        Task<IocNodeResponse?> GetByValueAsync(string value);
+
+        // Khai báo hàm tạo liên kết giữa 2 node
+        Task<bool> CreateRelationshipAsync(CreateRelationshipRequest request);
     }
 }

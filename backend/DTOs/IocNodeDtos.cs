@@ -45,6 +45,19 @@ namespace IocNodes.DTOs
         public string? OriginRef { get; set; }
     }
 
+    /// <summary>Payload cho việc nối 2 Node với nhau</summary>
+    public class CreateRelationshipRequest
+    {
+        [Required(ErrorMessage = "Value của Node nguồn không được để trống")]
+        public string FromValue { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Value của Node đích không được để trống")]
+        public string ToValue { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Loại quan hệ không được để trống")]
+        public string RelationType { get; set; } = string.Empty;
+    }
+
     // ---------------------------------------------------------------------------
     // Response DTO
     // ---------------------------------------------------------------------------
