@@ -83,6 +83,7 @@ namespace NT208_Project.Services
                 }
             }
 
+            
             await SeedAdminUserAsync();
 
             logger.LogInformation("HOÀN TẤT SETUP DATABASE!");

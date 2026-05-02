@@ -41,6 +41,21 @@ namespace IocNodes.DTOs
         public string? Country { get; set; }
 
         public List<string>? Tags { get; set; }
+
+        public string? OriginRef { get; set; }
+    }
+
+    /// <summary>Payload cho việc nối 2 Node với nhau</summary>
+    public class CreateRelationshipRequest
+    {
+        [Required(ErrorMessage = "Value của Node nguồn không được để trống")]
+        public string FromValue { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Value của Node đích không được để trống")]
+        public string ToValue { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Loại quan hệ không được để trống")]
+        public string RelationType { get; set; } = string.Empty;
     }
 
     // ---------------------------------------------------------------------------
@@ -58,6 +73,8 @@ namespace IocNodes.DTOs
         public List<string> Tags { get; set; } = new();
         public string OriginRef { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
+
+        public DateTime? UpdatedAt { get; set; }
     }
 
     // ---------------------------------------------------------------------------

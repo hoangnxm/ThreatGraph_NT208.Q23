@@ -12,5 +12,9 @@ namespace backend.Repositories
         Task<IocNode?> UpdateAsync(string key, IocNode node);
         Task<int> GetCountAsync(string? type = null, string? keyword = null);
         Task<bool> DeleteAsync(string key);
+
+        // Khai báo 2 hàm xử lý Đồ thị
+        Task<IocNode?> GetByValueAsync(string value);
+        Task<bool> CreateRelationshipAsync(string fromKey, string toKey, string relationType, string originRef);
     }
 }

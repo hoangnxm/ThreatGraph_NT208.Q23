@@ -22,6 +22,8 @@ const IocManagement = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({ type: 'IP', value: '', riskScore: 0, country: '', originRef: 'Manual Entry', tags: [] });
+    const [showRelForm, setShowRelForm] = useState(false);
+    const [relFormData, setRelFormData] = useState({ fromValue: '', toValue: '', relationType: 'related_to' });
 
     const fetchIocs = async () => {
         setLoading(true);
@@ -66,14 +68,56 @@ const handleDelete = async (id) => {
         e.preventDefault();
         try {
             if (isEditing) {
-                await axiosClient.put(`/iocnodes/${editingId}`, { riskScore: parseInt(formData.riskScore), country: formData.country, tags: formData.tags });
+                await axiosClient.put(`/iocnodes/${editingId}`, { 
+                    riskScore: parseInt(formData.riskScore), 
+                    country: formData.country, 
+                    tags: formData.tags 
+                });
             } else {
-                await axiosClient.post('/iocnodes', { ...formData, riskScore: parseInt(formData.riskScore) });
+                await axiosClient.post('/iocnodes', { 
+                    ...formData, 
+                    riskScore: parseInt(formData.riskScore) 
+                });
             }
+            
+            // Thành công thì đóng form và reset dữ liệu
             setShowForm(false);
             setFormData({ type: 'IP', value: '', riskScore: 0, country: '', originRef: 'Manual Entry', tags: [] });
             fetchIocs();
-        } catch (err) { alert("Lỗi khi lưu: " + (err.response?.data?.message || err.message)); }
+            
+        } catch (err) { 
+            // KIỂM TRA NẾU LỖI LÀ 409 CONFLICT (Trùng lặp Node)
+            if (err.response && err.response.status === 409) {
+                const errData = err.response.data;
+                
+                let alertMsg = `⚠️ CẢNH BÁO TRÙNG LẶP:\n\n`;
+                alertMsg += `${errData.message}\n`;
+                alertMsg += `Nguồn gốc dữ liệu: ${errData.source}\n`;
+                alertMsg += `ID của Node có sẵn: ${errData.existingKey}\n\n`;
+                alertMsg += `Vui lòng sử dụng ID này để tạo liên kết thay vì thêm mới!`;
+                
+                alert(alertMsg);
+            } else {
+                // Các lỗi khác (500, 400...)
+                alert("Lỗi khi lưu: " + (err.response?.data?.message || err.message)); 
+            }
+        }
+    };
+
+    const handleSaveRelationship = async (e) => {
+        e.preventDefault();
+        try {
+            // Gọi API POST mà bạn vừa test ngon lành trên Swagger
+            const res = await axiosClient.post('/iocnodes/relationship', relFormData);
+            
+            alert("✅ " + (res.data.message || 'Nối node thành công!'));
+            
+            // Đóng form và reset dữ liệu
+            setShowRelForm(false);
+            setRelFormData({ fromValue: '', toValue: '', relationType: 'related_to' });
+        } catch (err) { 
+            alert("❌ Lỗi khi nối node: " + (err.response?.data?.message || err.message)); 
+        }
     };
 
     const getTypeStyle = (t) => {
@@ -101,6 +145,12 @@ const handleDelete = async (id) => {
                         <option value="Domain">Chỉ xem Domain</option>
                         <option value="Hash">Chỉ xem Hash</option>
                     </select>
+
+                    <button 
+                        onClick={() => { setShowRelForm(!showRelForm); setShowForm(false); }}
+                        style={{ backgroundColor: '#8b5cf6', color: '#fff', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
+                        {showRelForm ? 'Đóng Nối Node' : '🔗 Nối Node'}
+                    </button>
 
                     <button 
                         onClick={() => { setIsEditing(false); setShowForm(!showForm); }}
@@ -133,6 +183,46 @@ const handleDelete = async (id) => {
                             {isEditing ? 'Lưu thay đổi' : 'Thêm vào hệ thống'}
                         </button>
                     </div>
+                </form>
+            )}
+
+            {/* FORM NHẬP LIỆU: TẠO LIÊN KẾT (RELATIONSHIP) */}
+            {showRelForm && (
+                <form onSubmit={handleSaveRelationship} style={{ backgroundColor: '#1e293b', padding: '20px', borderRadius: '8px', marginBottom: '20px', border: '1px dashed #8b5cf6' }}>
+                    <h3 style={{ color: '#c4b5fd', marginTop: 0 }}>🔗 Tạo Liên Kết Giữa 2 Node</h3>
+                    <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        
+                        <input 
+                            placeholder="Giá trị Node Nguồn (VD: 8.8.8.8)" 
+                            value={relFormData.fromValue} 
+                            onChange={e => setRelFormData({...relFormData, fromValue: e.target.value})} 
+                            style={inputStyle} 
+                            required 
+                        />
+                        <span style={{ color: '#94a3b8', fontWeight: 'bold' }}>🡲</span>
+                        <input 
+                            placeholder="Giá trị Node Đích (VD: google.com)" 
+                            value={relFormData.toValue} 
+                            onChange={e => setRelFormData({...relFormData, toValue: e.target.value})} 
+                            style={inputStyle} 
+                            required 
+                        />
+                        
+                        <input 
+                            placeholder="Loại quan hệ (VD: related_to)" 
+                            value={relFormData.relationType} 
+                            onChange={e => setRelFormData({...relFormData, relationType: e.target.value})} 
+                            style={inputStyle} 
+                            required 
+                        />
+                        
+                        <button type="submit" style={{ backgroundColor: '#8b5cf6', color: '#fff', padding: '10px 25px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
+                            Xác nhận nối
+                        </button>
+                    </div>
+                    <p style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '10px', marginBottom: 0 }}>
+                        * Gợi ý: Hãy copy cột ID (Key) của 2 IOC ở bảng bên dưới dán vào đây.
+                    </p>
                 </form>
             )}
 

@@ -24,6 +24,18 @@ namespace IocNodes.Services
             return MapToResponse(node);
         }
 
+        public async Task<IocNodeResponse?> GetByValueAsync(string value)
+        {
+            // Gọi xuống Repository để truy vấn DB
+            var node = await _repository.GetByValueAsync(value);
+
+            // Nếu không tìm thấy thì trả về null
+            if (node == null) return null;
+
+            // Nếu tìm thấy, chuyển đổi Model thành DTO (IocNodeResponse)
+            return MapToResponse(node);
+        }
+
         public async Task<IEnumerable<IocNodeResponse>> GetAllAsync(int offset, int limit)
         {
             var nodes = await _repository.GetAllAsync(offset, limit);
@@ -68,6 +80,7 @@ namespace IocNodes.Services
             var existingNode = await _repository.GetByIdAsync(id);
             if (existingNode == null) return null;
 
+            // ĐÈ THẲNG RỦI RO MỚI NHẤT TỪ NGUỒN (Bỏ cái trò giữ Max đi)
             if (request.RiskScore.HasValue) 
                 existingNode.RiskScore = request.RiskScore.Value;
             
@@ -75,16 +88,26 @@ namespace IocNodes.Services
                 existingNode.Country = request.Country;
             
             if (request.Tags != null) 
-                existingNode.Tags = request.Tags;
+            {
+                // Gộp Tag cũ và Tag mới, loại bỏ cái trùng lặp
+                existingNode.Tags = existingNode.Tags.Concat(request.Tags).Distinct().ToList();
+            }
+
+            if (request.OriginRef != null)
+                existingNode.OriginRef = request.OriginRef;
+
+            // CHỐT THỜI GIAN CẬP NHẬT MỚI NHẤT
+            existingNode.UpdatedAt = DateTime.UtcNow;
 
             var updatedNode = await _repository.UpdateAsync(id, existingNode);
             return updatedNode != null ? MapToResponse(updatedNode) : null;
         }
-
         public async Task<bool> DeleteAsync(string id)
         {
             return await _repository.DeleteAsync(id);
         }
+
+
 
         private IocNodeResponse MapToResponse(IocNode node)
         {
@@ -97,8 +120,34 @@ namespace IocNodes.Services
                 Country = node.Country,
                 Tags = node.Tags ?? new List<string>(),
                 OriginRef = node.OriginRef,
-                CreatedAt = node.CreatedAt
+                CreatedAt = node.CreatedAt,
+                UpdatedAt = node.UpdatedAt // Map thêm trường này
             };
+        }
+
+        public async Task<bool> CreateRelationshipAsync(CreateRelationshipRequest request)
+        {
+            // 1. Đi tìm Node nguồn (Từ IP/Domain user nhập)
+            var fromNode = await _repository.GetByValueAsync(request.FromValue.Trim());
+            if (fromNode == null || string.IsNullOrEmpty(fromNode.Key))
+            {
+                throw new Exception($"Không tìm thấy Node nguồn với giá trị: {request.FromValue}. Vui lòng thêm IOC này vào hệ thống trước.");
+            }
+
+            // 2. Đi tìm Node đích (Từ IP/Domain user nhập)
+            var toNode = await _repository.GetByValueAsync(request.ToValue.Trim());
+            if (toNode == null || string.IsNullOrEmpty(toNode.Key))
+            {
+                throw new Exception($"Không tìm thấy Node đích với giá trị: {request.ToValue}. Vui lòng thêm IOC này vào hệ thống trước.");
+            }
+
+            // 3. Đã có đủ 2 Key, tiến hành nối như bình thường
+            return await _repository.CreateRelationshipAsync(
+                fromNode.Key,
+                toNode.Key,
+                request.RelationType,
+                "Manual"
+            );
         }
     }
 }
