@@ -1,64 +1,91 @@
-import React, { useState } from 'react';
-import ForceGraph2D from 'react-force-graph-2d'; // Đã thêm thư viện vẽ Graph
+import React, {useState} from 'react';
+import ForceGraph2D from 'react-force-graph-2d';
 import './SearchPage.css';
 
 function SearchPage(){
-
   const [searchInput, setSearchInput] = useState('');
-  const [searchResult, setSearchResult] = useState(false);
-  const [graphData, setGraphData] = useState(null); // Thêm state lưu dữ liệu Graph
+  const [searchResult, setSearchResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+  
+  // TÍNH NĂNG MỚI: State lưu thông tin Node đang được click để hiển thị Popup
+  const [selectedNode, setSelectedNode] = useState(null);
 
   const handleSearch = async (event) => {
     event.preventDefault(); 
-
     if(searchInput.trim() === '') {return;}
+    
     setIsLoading(true);
     setSearchResult(null);
-    setGraphData(null); // Reset Graph khi quét mã mới
+    setSelectedNode(null); // Reset lại popup khi tìm cái mới
+    setGraphData({ nodes: [], links: [] });
     
     try{
-      // 1. Quét dữ liệu chi tiết IOC
-      const response = await fetch(`https://localhost:7193/api/Search/${searchInput}`);
+      const textResponse = await fetch(`https://localhost:7193/api/Search/${searchInput}`);
 
-      if(!response.ok){
-        if(response.status === 404){
-          alert("Không tìm thấy dấu vết mã độc này trong hệ thống!");
-        }
-        else{
-          alert("Lỗi Server!");
-        }
+      if(!textResponse.ok){
+        alert(textResponse.status === 404 ? "Không tìm thấy dấu vết mã độc này!" : "Lỗi Server Backend!");
         setIsLoading(false);
         return;
       }
 
-      const data = await response.json();
+      const textData = await textResponse.json();
 
-      const realData = {
-        iocValue: data.value,
-        type: data.type,
-        riskScore: data.riskScore,
-        country: data.country,
-        asn: data.originRef,
-        tags: data.tags
-      };
+      setSearchResult({
+        iocValue: textData.value || textData.Value,
+        type: textData.type || textData.Type,
+        riskScore: textData.riskScore || textData.RiskScore,
+        country: textData.country || textData.Country || "Unknown",
+        asn: textData.originRef || textData.OriginRef || "N/A",
+        tags: textData.tags || textData.Tags || []
+      });
 
-      setSearchResult(realData);
+      const searchKey = textData._key || textData.Key || textData.key;
 
-      // 2. Tự động gọi API quét dữ liệu Mạng nhện (Graph)
-      try {
-        const graphResponse = await fetch(`https://localhost:7193/api/Graph/${data.id}`);
-        if (graphResponse.ok) {
-          const gData = await graphResponse.json();
-          setGraphData(gData);
+      if (searchKey) {
+        const graphResponse = await fetch(`https://localhost:7193/api/Graph/${searchKey}`);
+        if(graphResponse.ok) {
+          const realGraphData = await graphResponse.json();
+          
+          const rawNodes = realGraphData.nodes || realGraphData.Nodes || [];
+          const rawLinks = realGraphData.links || realGraphData.Links || [];
+          const nodeMap = new Map();
+          
+          rawNodes.forEach(n => {
+             const id = n.id || n.Id || n._id || n.ID;
+             const type = n.type || n.Type || n.TYPE || "Node";
+             let color = n.color || n.Color || n.COLOR || "#8b949e";
+
+             if (type.toLowerCase() === 'domain' && color !== '#a371f7') {
+                 color = '#58a6ff'; 
+             }
+
+             if (id) {
+                nodeMap.set(id, {
+                   ...n,
+                   id: id,
+                   name: n.name || n.Name || n.NAME || "Unknown",
+                   type: type,
+                   val: Number(n.val || n.Val || n.VAL) || 5,
+                   color: color
+                });
+             }
+          });
+          const safeNodes = Array.from(nodeMap.values());
+
+          const safeLinks = rawLinks.map(l => ({
+             ...l,
+             source: l.source || l.Source || l.SOURCE || l._from,
+             target: l.target || l.Target || l.TARGET || l._to,
+             name: l.name || l.Name || l.NAME || ""
+          })).filter(l => l.source && l.target && nodeMap.has(l.source) && nodeMap.has(l.target));
+
+          setGraphData({ nodes: safeNodes, links: safeLinks });
         }
-      } catch (graphError) {
-        console.error("Lỗi khi kéo dữ liệu Graph:", graphError);
       }
 
     } catch(error){
       alert("Không thể kết nối đến Backend!");
-      console.error(error);
     } finally{
       setIsLoading(false);
     }
@@ -88,7 +115,7 @@ function SearchPage(){
         <div className="result-container">
           
           <div className="info-panel">
-            <h2 className="info-title">Chi tiết IOC</h2>
+            <h2 className="info-title">Chi tiết Tâm điểm</h2>
             <div className="info-row">
               <span className="info-label">Giá trị:</span>
               <strong className="info-value-large">{searchResult.iocValue}</strong>
@@ -102,46 +129,94 @@ function SearchPage(){
               <strong className="info-risk-high">{searchResult.riskScore} / 100</strong>
             </div>
             <div className="info-row">
-              <span className="info-label">Quốc gia & Mạng:</span>
+              <span className="info-label">Quốc gia & Nguồn:</span>
               <span>{searchResult.country} - {searchResult.asn}</span>
             </div>
-            <div className="info-row tags-row">
-              <span className="info-label tags-label">Nhãn dán (Tags):</span>
-              <div>
-                {searchResult.tags.map((tag, index) => (
-                  <span key={index} className="tag-badge">{tag}</span>
-                ))}
-              </div>
-            </div>
-            <button className="btn-export" onClick={() => alert("Chức năng tải PDF đang được phát triển!")}>
-              📄 Xuất Báo Cáo (PDF)
-            </button>
           </div>
 
-          <div className="graph-panel">
-            <div className="graph-content">
-              <h3 className="graph-title">🕸️ Khu vực Mạng nhện (Graph)</h3>
-              
-              {/* Khu vực render Component biểu đồ */}
-              <div style={{ height: '400px', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                {graphData && graphData.nodes && graphData.nodes.length > 0 ? (
-                  <ForceGraph2D
-                    graphData={graphData}
-                    nodeLabel={(node) => `${node.name} (${node.type})`} // Tên hiển thị khi trỏ chuột
-                    nodeColor={(node) => node.color} 
-                    nodeVal={(node) => node.val}     
-                    linkColor={() => '#94a3b8'}      // Màu liên kết
-                    width={550}                      // Chỉnh lại width cho vừa flex box
-                    height={400}
-                    linkDirectionalArrowLength={3.5} // Mũi tên chỉ hướng quan hệ
-                    linkDirectionalArrowRelPos={1}
-                  />
-                ) : (
-                  <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Chưa có dữ liệu liên kết cho IOC này.</p>
-                )}
-              </div>
+          <div className="graph-panel" style={{ overflow: 'hidden', position: 'relative' }}>
+             
+             {/* Bảng chú giải */}
+             <div style={{ position: 'absolute', top: 15, left: 15, background: 'rgba(22, 27, 34, 0.8)', padding: '10px 15px', borderRadius: 8, border: '1px solid #30363d', fontSize: 13, zIndex: 10, textAlign: 'left' }}>
+                <div style={{fontWeight: 'bold', marginBottom: 8, color: '#c9d1d9'}}>Mức độ rủi ro (Risk)</div>
+                <div style={{color: '#a371f7', marginBottom: 4}}>🟣 Tâm điểm tra cứu</div>
+                <div style={{color: '#58a6ff', marginBottom: 4}}>🔵 Domain (Tên miền)</div>
+                <div style={{color: '#ff7b72', marginBottom: 4}}>🔴 Cao (&ge; 80)</div>
+                <div style={{color: '#d29922', marginBottom: 4}}>🟡 Cảnh báo (&ge; 50)</div>
+                <div style={{color: '#238636'}}>🟢 An toàn (&lt; 50)</div>
+             </div>
 
-            </div>
+             {selectedNode && (
+                <div style={{ 
+                    position: 'absolute', top: 15, right: 15, background: 'rgba(15, 23, 42, 0.95)', 
+                    padding: '15px 20px', borderRadius: '10px', border: '1px solid #38bdf8', 
+                    fontSize: '14px', zIndex: 20, textAlign: 'left', minWidth: '220px',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #334155', paddingBottom: '8px', marginBottom: '12px' }}>
+                        <strong style={{ color: '#38bdf8' }}>Chi tiết Node</strong>
+                        <button onClick={() => setSelectedNode(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold' }}>X</button>
+                    </div>
+                    <div style={{ color: '#c9d1d9', marginBottom: '8px' }}><strong>Giá trị: </strong>{selectedNode.name}</div>
+                    <div style={{ color: '#c9d1d9', marginBottom: '8px' }}><strong>Loại: </strong> <span style={{ color: selectedNode.color, fontWeight: 'bold' }}>{selectedNode.type}</span></div>
+                    <div style={{ color: '#c9d1d9' }}><strong>Màu sắc nhận diện: </strong> <span style={{ display: 'inline-block', width: '12px', height: '12px', backgroundColor: selectedNode.color, borderRadius: '50%' }}></span></div>
+                </div>
+             )}
+
+             {graphData.nodes.length > 0 ? (
+               <ForceGraph2D
+                  graphData={graphData}
+                  width={700}
+                  height={500}
+                  linkColor={() => 'rgba(255, 255, 255, 0.3)'}
+                  linkWidth={1.5}
+                  linkLabel="name" 
+                  linkDirectionalArrowLength={4}
+                  linkDirectionalArrowRelPos={1}
+
+                  onNodeClick={(node) => setSelectedNode(node)} 
+
+                  nodeCanvasObject={(node, ctx, globalScale) => {
+                    try {
+                      const x = node.x || 0;
+                      const y = node.y || 0;
+                      const radius = node.val + 2;
+                      const label = `[${node.type}] ${node.name}`;
+                      const fontSize = 12 / globalScale;
+                      
+                      ctx.font = `${fontSize}px Sans-Serif`;
+                      
+                      ctx.beginPath();
+                      ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
+                      ctx.fillStyle = node.color;
+                      ctx.fill();
+                      
+                      ctx.lineWidth = node.color === '#a371f7' ? 2 : 1;
+                      ctx.strokeStyle = '#ffffff';
+                      ctx.stroke();
+
+                      if (selectedNode && selectedNode.id === node.id) {
+                          ctx.beginPath();
+                          ctx.arc(x, y, radius + 3, 0, 2 * Math.PI, false);
+                          ctx.strokeStyle = '#38bdf8';
+                          ctx.lineWidth = 2;
+                          ctx.stroke();
+                      }
+
+                      ctx.textAlign = 'center';
+                      ctx.textBaseline = 'top';
+                      ctx.fillStyle = '#c9d1d9'; 
+                      ctx.fillText(label, x, y + radius + 4);
+                    } catch (err) {
+                      console.error("Lỗi vẽ canvas:", err);
+                    }
+                  }}
+               />
+             ) : (
+               <div style={{color: '#8b949e', textAlign: 'center', width: '100%', marginTop: '40%'}}>
+                  Đang tải đồ thị hoặc Node này chưa có mối liên hệ nào...
+               </div>
+             )}
           </div>
         </div>
       )}
