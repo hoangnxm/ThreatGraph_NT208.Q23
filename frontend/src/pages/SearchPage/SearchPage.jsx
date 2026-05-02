@@ -1,5 +1,8 @@
 import React, {useState} from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
+import axiosClient from '../../api/axiosClient';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import './SearchPage.css';
 
 function SearchPage(){
@@ -7,6 +10,8 @@ function SearchPage(){
   const [searchResult, setSearchResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+  const [isExporting, setIsExporting] = useState(false);
+  
   
   // TÍNH NĂNG MỚI: State lưu thông tin Node đang được click để hiển thị Popup
   const [selectedNode, setSelectedNode] = useState(null);
@@ -91,6 +96,64 @@ function SearchPage(){
     }
   };
 
+  const handleExportPDF = async () =>{
+    if(!searchResult) return;
+    setIsExporting(true);
+
+    try{
+      const pdf = new jsPDF('p','mm', 'a4');
+
+      // Tiêu đề
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(22);
+      pdf.setTextColor(220, 38, 38); 
+      pdf.text("BAO CAO PHAN TICH MA DOC", 105, 20, { align: "center" });
+
+      // Chi tiết
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(12);
+      pdf.setTextColor(0, 0, 0);
+      
+      let currentY = 40;
+      const lineSpacing = 8;
+
+      pdf.text(`Ten ma doc: ${searchResult.iocValue}`, 20, currentY); currentY += lineSpacing;
+      pdf.text(`Loai: ${searchResult.type}`, 20, currentY); currentY += lineSpacing;
+      pdf.text(`Diem rui ro: ${searchResult.riskScore}/100`, 20, currentY); currentY += lineSpacing;
+      pdf.text(`Quoc gia: ${searchResult.country}`, 20, currentY); currentY += lineSpacing;
+      pdf.text(`Nguon tao: ${searchResult.asn}`, 20, currentY); currentY += lineSpacing;
+      
+      currentY += 10;
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Danh sach cac IOC lien doi (Visual Graph):", 20, currentY);
+
+      // Chụp ảnh Graph   
+      const graphElement = document.querySelector('.graph-panel');
+      if (graphElement) {
+        const canvas = await html2canvas(graphElement, {
+          scale: 2,
+          backgroundColor: '#0f172a',
+          useCORS: true
+        });
+        
+        const imgData = canvas.toDataURL('image/png');
+        const imgWidth = 170; 
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        
+        // Chèn ảnh vào PDF
+        pdf.addImage(imgData, 'PNG', 20, currentY + 5, imgWidth, imgHeight);
+      }
+
+      pdf.save(`NexusTIP_Report_${searchResult.iocValue}.pdf`);
+
+    } catch (err) {
+      console.error("Lỗi xuất PDF:", err);
+      alert("Lỗi khi tạo file PDF!");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="search-page-wrapper">
       <div className="search-header">
@@ -116,6 +179,12 @@ function SearchPage(){
           
           <div className="info-panel">
             <h2 className="info-title">Chi tiết Tâm điểm</h2>
+            <button 
+                    onClick={handleExportPDF} 
+                    disabled={isExporting}
+                    style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
+                    {isExporting ? 'Đang xuất...' : '📄 Xuất PDF'}
+            </button>
             <div className="info-row">
               <span className="info-label">Giá trị:</span>
               <strong className="info-value-large">{searchResult.iocValue}</strong>

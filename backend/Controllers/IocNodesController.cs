@@ -2,6 +2,8 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using IocNodes.DTOs;
 using IocNodes.Services;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace IocNodes.Controllers
 {
@@ -35,34 +37,46 @@ namespace IocNodes.Controllers
 
         // POST: api/iocnodes
         [HttpPost]
+        [Authorize]
         public async Task<IActionResult> Create([FromBody] CreateIocNodeRequest request)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            // 1. KIỂM TRA TRÙNG LẶP TRƯỚC KHI TẠO
-            // Gọi xuống Service để tìm xem Value này đã có trong Database chưa
-            var existingNode = await _service.GetByValueAsync(request.Value);
-
-            if (existingNode != null)
+            try
             {
-                // Nếu đã tồn tại, trả về lỗi 409 Conflict cùng với thông tin của Node cũ
-                return StatusCode(409, new
+                // 1. KIỂM TRA TRÙNG LẶP TRƯỚC KHI TẠO
+                // Gọi xuống Service để tìm xem Value này đã có trong Database chưa
+                var existingNode = await _service.GetByValueAsync(request.Value);
+
+                if (existingNode != null)
                 {
-                    message = $"Node '{request.Value}' đã tồn tại trong hệ thống!",
-                    source = existingNode.OriginRef,
-                    existingKey = existingNode.Id // Hoặc existingNode.Key tùy thuộc vào model trả về của bạn
-                });
+                    // Nếu đã tồn tại, trả về lỗi 409 Conflict cùng với thông tin của Node cũ
+                    return StatusCode(409, new
+                    {
+                        message = $"Node '{request.Value}' đã tồn tại trong hệ thống!",
+                        source = existingNode.OriginRef,
+                        existingKey = existingNode.Id // Hoặc existingNode.Key tùy thuộc vào model trả về của bạn
+                    });
+                }
+
+                var currentUser = User.Identity?.Name ?? "Unknown";
+                request.OriginRef = currentUser;
+
+                // 2. NẾU CHƯA CÓ THÌ TIẾN HÀNH TẠO MỚI
+                var result = await _service.CreateAsync(request);
+
+                // Trả về HTTP 201 Created kèm header Location trỏ tới URL của resource vừa tạo
+                return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
             }
-
-            // 2. NẾU CHƯA CÓ THÌ TIẾN HÀNH TẠO MỚI
-            var result = await _service.CreateAsync(request);
-
-            // Trả về HTTP 201 Created kèm header Location trỏ tới URL của resource vừa tạo
-            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi hệ thống khi tạo IOC", error = ex.Message });
+            }
         }
 
         // POST: api/iocnodes/relationship
         [HttpPost("relationship")]
+        [Authorize]
         public async Task<IActionResult> CreateRelationship([FromBody] CreateRelationshipRequest request)
         {
             // Kiểm tra xem Frontend có gửi thiếu trường nào trong DTO không
@@ -88,25 +102,68 @@ namespace IocNodes.Controllers
 
         // PUT: api/iocnodes/{id}
         [HttpPut("{id}")]
+        [Authorize]
         public async Task<IActionResult> Update([FromRoute] string id, [FromBody] UpdateIocNodeRequest request)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var result = await _service.UpdateAsync(id, request);
-            if (result == null) return NotFound(new { Message = $"Không tìm thấy IOC với ID: {id} để update" });
-            
-            return Ok(result);
+            try
+            {
+                var currentUser = User.Identity?.Name;
+                var isAdmin = User.IsInRole("Admin");
+
+                // Lấy IOC để kiểm tra quyền
+                var existingIoc = await _service.GetByIdAsync(id);
+                if (existingIoc == null)
+                    return NotFound(new { Message = $"Không tìm thấy IOC với ID: {id} để update" });
+
+                // Phân quyền sửa
+                if (!isAdmin && existingIoc.OriginRef != currentUser)
+                {
+                    return StatusCode(403, new { message = "Cảnh báo: Bạn không có quyền sửa dữ liệu do người khác tạo!" });
+                }
+
+                // Tiến hành update (giữ nguyên logic gọi service của ông)
+                var result = await _service.UpdateAsync(id, request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi hệ thống khi cập nhật", error = ex.Message });
+            }
         }
 
         // DELETE: api/iocnodes/{id}
         [HttpDelete("{id}")]
+        [Authorize]
         public async Task<IActionResult> Delete([FromRoute] string id)
         {
-            var success = await _service.DeleteAsync(id);
-            if (!success) return NotFound(new { Message = $"Không tìm thấy IOC với ID: {id} để xóa" });
-            
-            // Xóa thành công thì trả về HTTP 204 No Content là chuẩn bài RESTful nhất
-            return NoContent(); 
+            try
+            {
+
+                // Lấy thông tin user đang request
+                var currentUser = User.Identity?.Name;
+                var isAdmin = User.IsInRole("Admin");
+
+                // Lấy dữ liệu
+                var existingIoc = await _service.GetByIdAsync(id);
+                if (existingIoc == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy IOC này" });
+                }
+
+                // Phân quyền
+                if (!isAdmin && existingIoc.OriginRef != currentUser)
+                {
+                    return StatusCode(403, new { message = "Cảnh báo: Bạn không có quyền xóa dữ liệu của người khác!" });
+                }
+
+                await _service.DeleteAsync(id);
+                return Ok(new { message = "Xóa IOC thành công!" });
+            }catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi hệ thống", error = ex.Message });
+            }
         }
 
         

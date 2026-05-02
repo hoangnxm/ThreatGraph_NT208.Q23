@@ -53,14 +53,14 @@ const IocManagement = () => {
 
     // XÓA IOC
 const handleDelete = async (id) => {
-        if (!window.confirm("Mày có chắc chắn muốn xóa IOC này không?")) return;
+        if (!window.confirm("Bạn có chắc chắn muốn xóa IOC này không?")) return;
         try { await axiosClient.delete(`/iocnodes/${id}`); fetchIocs(); } 
         catch (err) { alert("Lỗi khi xóa: " + (err.response?.data?.message || err.message)); }
     };
 
     const handleEditClick = (ioc) => {
         setIsEditing(true); setEditingId(ioc.id);
-        setFormData({ type: ioc.type, value: ioc.value, riskScore: ioc.riskScore, country: ioc.country || '', originRef: ioc.originRef, tags: ioc.tags || [] });
+        setFormData({ type: ioc.type, value: ioc.value, riskScore: ioc.riskScore, country: ioc.country || '', tags: ioc.tags || [] });
         setShowForm(true);
     };
 
@@ -82,7 +82,7 @@ const handleDelete = async (id) => {
             
             // Thành công thì đóng form và reset dữ liệu
             setShowForm(false);
-            setFormData({ type: 'IP', value: '', riskScore: 0, country: '', originRef: 'Manual Entry', tags: [] });
+            setFormData({ type: 'IP', value: '', riskScore: 0, country: '', tags: [] });
             fetchIocs();
             
         } catch (err) { 
@@ -173,7 +173,6 @@ const handleDelete = async (id) => {
                                     <option value="Hash">Hash</option>
                                 </select>
                                 <input placeholder="Giá trị (IP/Domain/Hash)" value={formData.value} onChange={e => setFormData({...formData, value: e.target.value})} style={inputStyle} required />
-                                <input placeholder="Nguồn (Origin)" value={formData.originRef} onChange={e => setFormData({...formData, originRef: e.target.value})} style={inputStyle} required />
                             </>
                         )}
                         <input type="number" placeholder="Risk Score (0-100)" value={formData.riskScore} onChange={e => setFormData({...formData, riskScore: e.target.value})} style={inputStyle} />
@@ -181,6 +180,18 @@ const handleDelete = async (id) => {
                         
                         <button type="submit" style={{ backgroundColor: '#16a34a', color: '#fff', padding: '10px 25px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
                             {isEditing ? 'Lưu thay đổi' : 'Thêm vào hệ thống'}
+                        </button>
+
+                        <button 
+                            type="button" 
+                            onClick={() => {
+                                setShowForm(false);
+                                setIsEditing(false);
+                                setEditingId(null);
+                                setFormData({ type: 'IP', value: '', riskScore: 0, country: '', tags: [] });
+                            }} 
+                            style={{ backgroundColor: '#64748b', color: '#fff', padding: '10px 25px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
+                            Hủy
                         </button>
                     </div>
                 </form>
@@ -234,6 +245,7 @@ const handleDelete = async (id) => {
                         <th>Loại</th>
                         <th>Độ rủi ro</th>
                         <th>Quốc gia</th>
+                        <th>Nguồn tạo</th>
                         <th>Thao tác</th>
                     </tr>
                 </thead>
@@ -245,6 +257,7 @@ const handleDelete = async (id) => {
                             <td><span style={{ backgroundColor: getTypeStyle(ioc.type).bg, color: getTypeStyle(ioc.type).text, padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '0.8rem' }}>{ioc.type}</span></td>
                             <td style={{ color: ioc.riskScore > 70 ? '#fca5a5' : '#86efac', fontWeight: 'bold' }}>{ioc.riskScore}</td>
                             <td>{ioc.country || '--'}</td>
+                            <td style={{ color: '#94a3b8' }}>{ioc.originRef || 'AlienVault'}</td>
                             <td>
                                 <button onClick={() => handleEditClick(ioc)} style={{ color: '#eab308', background: 'none', border: 'none', cursor: 'pointer', marginRight: '10px' }}>Sửa</button>
                                 <button onClick={() => handleDelete(ioc.id)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}>Xóa</button>
