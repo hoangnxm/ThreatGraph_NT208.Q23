@@ -37,7 +37,7 @@ namespace backend.Repositories
                 bindVars.Add("keyword", keyword);
             }
 
-            var query = $"FOR i IN @@collection {filterAql} SORT i.CreatedAt DESC LIMIT @offset, @limit RETURN i";
+            var query = $"FOR i IN @@collection {filterAql} SORT i._key DESC LIMIT @offset, @limit RETURN i";
             var response = await _dbClient.Cursor.PostCursorAsync<IocNode>(new PostCursorBody { Query = query, BindVars = bindVars });
             return response.Result;
         }

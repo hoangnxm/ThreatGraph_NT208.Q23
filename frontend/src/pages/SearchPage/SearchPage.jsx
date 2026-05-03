@@ -18,23 +18,17 @@ function SearchPage(){
 
   const handleSearch = async (event) => {
     event.preventDefault(); 
-    if(searchInput.trim() === '') {return;}
+    if(searchInput.trim() === '') { return; }
     
     setIsLoading(true);
     setSearchResult(null);
-    setSelectedNode(null); // Reset lại popup khi tìm cái mới
+    setSelectedNode(null); 
     setGraphData({ nodes: [], links: [] });
     
-    try{
-      const textResponse = await fetch(`https://localhost:7193/api/Search/${searchInput}`);
-
-      if(!textResponse.ok){
-        alert(textResponse.status === 404 ? "Không tìm thấy dấu vết mã độc này!" : "Lỗi Server Backend!");
-        setIsLoading(false);
-        return;
-      }
-
-      const textData = await textResponse.json();
+    try {
+      // 1. GỌI API SEARCH ĐỂ LẤY THÔNG TIN CHI TIẾT VÀ CÁI KEY
+      const textResponse = await axiosClient.get(`/Search/${searchInput}`);
+      const textData = textResponse.data; // Axios tự chuyển JSON rồi, không cần .json()
 
       setSearchResult({
         iocValue: textData.value || textData.Value,
@@ -45,53 +39,63 @@ function SearchPage(){
         tags: textData.tags || textData.Tags || []
       });
 
+      // Lấy Key từ kết quả tìm kiếm để gọi tiếp API Graph[cite: 15, 16]
       const searchKey = textData._key || textData.Key || textData.key;
 
       if (searchKey) {
-        const graphResponse = await fetch(`https://localhost:7193/api/Graph/${searchKey}`);
-        if(graphResponse.ok) {
-          const realGraphData = await graphResponse.json();
-          
-          const rawNodes = realGraphData.nodes || realGraphData.Nodes || [];
-          const rawLinks = realGraphData.links || realGraphData.Links || [];
-          const nodeMap = new Map();
-          
-          rawNodes.forEach(n => {
-             const id = n.id || n.Id || n._id || n.ID;
-             const type = n.type || n.Type || n.TYPE || "Node";
-             let color = n.color || n.Color || n.COLOR || "#8b949e";
+        // 2. GỌI API GRAPH ĐỂ LẤY MẠNG NHỆN[cite: 15, 16]
+        const graphResponse = await axiosClient.get(`/Graph/${searchKey}`);
+        const realGraphData = graphResponse.data;
+        
+        const rawNodes = realGraphData.nodes || realGraphData.Nodes || [];
+        const rawLinks = realGraphData.links || realGraphData.Links || [];
+        const nodeMap = new Map();
+        
+        // Map dữ liệu nốt để đảm bảo không bị lỗi giao diện[cite: 16]
+        rawNodes.forEach(n => {
+           const id = n.id || n.Id || n._id || n.ID;
+           const type = n.type || n.Type || n.TYPE || "Node";
+           let color = n.color || n.Color || n.COLOR || "#8b949e";
 
-             if (type.toLowerCase() === 'domain' && color !== '#a371f7') {
-                 color = '#58a6ff'; 
-             }
+           // Đổi màu riêng cho Domain để dễ nhìn
+           if (type.toLowerCase() === 'domain' && color !== '#a371f7') {
+               color = '#58a6ff'; 
+           }
 
-             if (id) {
-                nodeMap.set(id, {
-                   ...n,
-                   id: id,
-                   name: n.name || n.Name || n.NAME || "Unknown",
-                   type: type,
-                   val: Number(n.val || n.Val || n.VAL) || 5,
-                   color: color
-                });
-             }
-          });
-          const safeNodes = Array.from(nodeMap.values());
+           if (id) {
+              nodeMap.set(id, {
+                 ...n,
+                 id: id,
+                 name: n.name || n.Name || n.NAME || "Unknown",
+                 type: type,
+                 val: Number(n.val || n.Val || n.VAL) || 5,
+                 color: color
+              });
+           }
+        });
 
-          const safeLinks = rawLinks.map(l => ({
-             ...l,
-             source: l.source || l.Source || l.SOURCE || l._from,
-             target: l.target || l.Target || l.TARGET || l._to,
-             name: l.name || l.Name || l.NAME || ""
-          })).filter(l => l.source && l.target && nodeMap.has(l.source) && nodeMap.has(l.target));
+        const safeNodes = Array.from(nodeMap.values());
 
-          setGraphData({ nodes: safeNodes, links: safeLinks });
-        }
+        // Xử lý các đường liên kết
+        const safeLinks = rawLinks.map(l => ({
+           ...l,
+           source: l.source || l.Source || l.SOURCE || l._from,
+           target: l.target || l.Target || l.TARGET || l._to,
+           name: l.name || l.Name || l.NAME || ""
+        })).filter(l => l.source && l.target && nodeMap.has(l.source) && nodeMap.has(l.target));
+
+        setGraphData({ nodes: safeNodes, links: safeLinks });
       }
 
-    } catch(error){
-      alert("Không thể kết nối đến Backend!");
-    } finally{
+    } catch(error) {
+      // Xử lý lỗi tập trung ở đây
+      if (error.response && error.response.status === 404) {
+        alert("Không tìm thấy dấu vết mã độc này!");
+      } else {
+        console.error("Lỗi kết nối:", error);
+        alert("Lỗi kết nối đến Backend! Kiểm tra lại Port 5113.");
+      }
+    } finally {
       setIsLoading(false);
     }
   };
