@@ -1,11 +1,13 @@
 ﻿using ArangoDBNetStandard;
 using ArangoDBNetStandard.CursorApi.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace NT208_Project.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class GraphController : ControllerBase
     {
         private readonly IArangoDBClient _dbClient;

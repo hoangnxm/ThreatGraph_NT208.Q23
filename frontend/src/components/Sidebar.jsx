@@ -1,8 +1,32 @@
 import React from 'react';
+import { jwtDecode } from "jwt-decode";
 import { Link } from 'react-router-dom';
 
 const Sidebar = () => {
-    const role = localStorage.getItem('role');
+    const getRoleSecurely = () => {
+        const token = localStorage.getItem('token');
+        if (!token) return null;
+        try {
+            const decoded = jwtDecode(token);
+            console.log("Payload của Token:", decoded); 
+
+            // Tìm nhiều khả năng cho trường role: C# có thể trả về dưới dạng claim với key khác nhau
+            let userRole = decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] 
+                        || decoded.role 
+                        || decoded.Role;
+
+            // Nếu role là một mảng (có thể xảy ra nếu người dùng có nhiều vai trò), lấy vai trò đầu tiên   
+            if (Array.isArray(userRole)) {
+                userRole = userRole[0];
+            }
+
+            return userRole;
+        } catch (error) {
+            return null;
+        }
+    };
+    const role = getRoleSecurely();
+
 
     const linkStyle = { color: '#94a3b8', textDecoration: 'none', padding: '15px 20px', display: 'block', borderBottom: '1px solid #1e293b' };
     return (
