@@ -20,6 +20,7 @@ namespace IocNodes.Controllers
 
         // GET: api/iocnodes?offset=0&limit=50
         [HttpGet]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetAll([FromQuery] int offset = 0, [FromQuery] int limit = 50)
         {
             var result = await _service.GetAllAsync(offset, limit);
@@ -76,7 +77,7 @@ namespace IocNodes.Controllers
 
         // POST: api/iocnodes/relationship
         [HttpPost("relationship")]
-        [Authorize]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> CreateRelationship([FromBody] CreateRelationshipRequest request)
         {
             // Kiểm tra xem Frontend có gửi thiếu trường nào trong DTO không
@@ -169,6 +170,7 @@ namespace IocNodes.Controllers
         
         // GET: api/iocnodes/paged?offset=0&limit=50&type=IP&keyword=103
         [HttpGet("paged")]
+        [Authorize]
         public async Task<IActionResult> GetAllPaged([FromQuery] int offset = 0, [FromQuery] int limit = 50, [FromQuery] string? type = null, [FromQuery] string? keyword = null)
         {
             var result = await _service.GetAllPagedAsync(offset, limit, type, keyword);

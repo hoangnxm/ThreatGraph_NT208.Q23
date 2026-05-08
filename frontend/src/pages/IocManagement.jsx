@@ -17,6 +17,36 @@ const IocManagement = () => {
     const [totalCount, setTotalCount] = useState(0);
     const [typeFilter, setTypeFilter] = useState(''); // State mới cho Dropdown lọc Type
 
+  // --- CODE MỚI THÊM: Quản lý ô nhập số trang ---
+    const [inputPage, setInputPage] = useState(1);
+    const totalPages = Math.ceil(totalCount / limit) || 1;
+
+    // Đồng bộ ô input khi trang thay đổi (do bấm Next/Prev hoặc search)
+    useEffect(() => {
+        setInputPage(page);
+    }, [page]);
+
+    const handleInputPageChange = (e) => {
+        // Chỉ cho phép nhập số nguyên (Regex loại bỏ mọi dấu -, ., e, chữ cái)
+        const val = e.target.value.replace(/[^0-9]/g, '');
+        setInputPage(val);
+    };
+
+    const handleInputPageSubmit = (e) => {
+        // Chỉ chạy khi bấm Enter hoặc click chuột ra ngoài (blur)
+        if (e.key === 'Enter' || e.type === 'blur') {
+            let value = parseInt(inputPage, 10);
+
+            if (isNaN(value) || value < 1) {
+                value = 1; // Nhập tào lao thì về trang 1
+            } else if (value > totalPages) {
+                value = totalPages; // Nhập lố thì về trang cuối
+            }
+
+            setPage(value);
+            setInputPage(value);
+        }
+    };
     // State quản lý Form
     const [showForm, setShowForm] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -279,13 +309,22 @@ const handleDelete = async (id) => {
                         style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: page === 1 ? '#334155' : '#2563eb', color: '#fff', cursor: page === 1 ? 'not-allowed' : 'pointer' }}>
                         Quay lại
                     </button>
-                    <span style={{ padding: '8px 16px', backgroundColor: '#1e293b', borderRadius: '6px', color: '#e2e8f0', fontWeight: 'bold' }}>
-                        Trang {page} / {Math.ceil(totalCount / limit) || 1}
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 16px', backgroundColor: '#1e293b', borderRadius: '6px', color: '#e2e8f0', fontWeight: 'bold' }}>
+                        Trang
+                        <input
+                            type="text" // Dùng text kết hợp Regex để chặn tuyệt đối dấu chấm phẩy
+                            value={inputPage}
+                            onChange={handleInputPageChange}
+                            onKeyDown={handleInputPageSubmit}
+                            onBlur={handleInputPageSubmit}
+                            style={{ width: '45px', padding: '4px', textAlign: 'center', borderRadius: '6px', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#fff', fontWeight: 'bold' }}
+                        />
+                        / {totalPages}
                     </span>
                     <button 
-                        disabled={page >= Math.ceil(totalCount / limit)} 
+                        disabled={page >= totalPages} 
                         onClick={() => setPage(page + 1)}
-                        style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: page >= Math.ceil(totalCount / limit) ? '#334155' : '#2563eb', color: '#fff', cursor: page >= Math.ceil(totalCount / limit) ? 'not-allowed' : 'pointer' }}>
+                        style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: page >= totalPages ? '#334155' : '#2563eb', color: '#fff', cursor: page >= totalPages ? 'not-allowed' : 'pointer' }}>
                         Tiếp theo
                     </button>
                 </div>

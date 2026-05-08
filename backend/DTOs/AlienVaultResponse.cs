@@ -16,6 +16,10 @@ namespace IocNodes.DTOs
         public List<OtxIndicator> Indicators { get; set; } = new();
     }
 
+    public class OtxIndicatorResponse
+    {
+        public List<OtxIndicator> Results { get; set; } = new();
+    }
     // Indicator chính là các IOC (IP, Domain, Hash)
     public class OtxIndicator
     {
@@ -23,4 +27,6 @@ namespace IocNodes.DTOs
         public string Type { get; set; } = string.Empty;      // Loại (VD: IPv4, hostname)
         public string Description { get; set; } = string.Empty;
     }
+
+
 }

@@ -20,15 +20,13 @@ const Login = () => {
                 username: username,
                 password: password
             });
-
             // Nếu Backend trả về token thành công
             if (response.data && response.data.token) {
-                // 1. Lưu token và role vào bộ nhớ trình duyệt
+                localStorage.clear(); // Xóa token cũ trước khi đăng nhập mới
                 localStorage.setItem('token', response.data.token);
-                localStorage.setItem('role', response.data.role);
 
-                // 2. Đá thẳng vào trang Dashboard
-                navigate('/');
+                // Chuyển hướng về trang Dashboard sau khi đăng nhập thành công
+                window.location.href = '/';
             }
         } catch (err) {
             // Bắt lỗi từ Backend trả về (sai pass, tài khoản khóa...)

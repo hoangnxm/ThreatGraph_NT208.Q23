@@ -64,7 +64,7 @@ namespace NT208_Project.Controllers
                     signingCredentials: creds
                 );
 
-                return Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token), role = role });
+                return Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token) });
             }
             catch (Exception ex)
             {

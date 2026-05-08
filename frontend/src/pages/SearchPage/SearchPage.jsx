@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useCallback, useRef, useEffect} from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import axiosClient from '../../api/axiosClient';
 import jsPDF from 'jspdf';
@@ -12,29 +12,41 @@ function SearchPage(){
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [isExporting, setIsExporting] = useState(false);
   
-  
-  // TÍNH NĂNG MỚI: State lưu thông tin Node đang được click để hiển thị Popup
   const [selectedNode, setSelectedNode] = useState(null);
+  
+  // TÍNH NĂNG MỚI 1: State để theo dõi chuột đang chỉ vào Node nào (để hiện chữ)
+  const [hoverNode, setHoverNode] = useState(null);
+
+  // Sổ tay đếm số lần mở rộng
+  const expandStatsRef = useRef({});
+  
+  // TÍNH NĂNG MỚI 2: Tạo cần gạt điều khiển động cơ vật lý của ForceGraph
+  const fgRef = useRef();
+
+  // Động cơ vật lý: Tự động chạy lại mỗi khi graphData thay đổi (kéo thêm node)
+  useEffect(() => {
+    if (fgRef.current) {
+      // Đẩy tụi nó văng xa ra nhau
+      fgRef.current.d3Force('charge').strength(-400);
+      // Nới lỏng dây thừng
+      fgRef.current.d3Force('link').distance(120);
+      // Khởi động lại engine
+      fgRef.current.d3ReheatSimulation();
+    }
+  }, [graphData]);
 
   const handleSearch = async (event) => {
     event.preventDefault(); 
-    if(searchInput.trim() === '') {return;}
+    if(searchInput.trim() === '') { return; }
     
     setIsLoading(true);
     setSearchResult(null);
-    setSelectedNode(null); // Reset lại popup khi tìm cái mới
+    setSelectedNode(null); 
     setGraphData({ nodes: [], links: [] });
     
-    try{
-      const textResponse = await fetch(`https://localhost:7193/api/Search/${searchInput}`);
-
-      if(!textResponse.ok){
-        alert(textResponse.status === 404 ? "Không tìm thấy dấu vết mã độc này!" : "Lỗi Server Backend!");
-        setIsLoading(false);
-        return;
-      }
-
-      const textData = await textResponse.json();
+    try {
+      const textResponse = await axiosClient.get(`/Search/${searchInput}`);
+      const textData = textResponse.data; 
 
       setSearchResult({
         iocValue: textData.value || textData.Value,
@@ -48,110 +60,163 @@ function SearchPage(){
       const searchKey = textData._key || textData.Key || textData.key;
 
       if (searchKey) {
-        const graphResponse = await fetch(`https://localhost:7193/api/Graph/${searchKey}`);
-        if(graphResponse.ok) {
-          const realGraphData = await graphResponse.json();
-          
-          const rawNodes = realGraphData.nodes || realGraphData.Nodes || [];
-          const rawLinks = realGraphData.links || realGraphData.Links || [];
-          const nodeMap = new Map();
-          
-          rawNodes.forEach(n => {
-             const id = n.id || n.Id || n._id || n.ID;
-             const type = n.type || n.Type || n.TYPE || "Node";
-             let color = n.color || n.Color || n.COLOR || "#8b949e";
+        const graphResponse = await axiosClient.get(`/Graph/${searchKey}`);
+        const realGraphData = graphResponse.data;
+        
+        const rawNodes = realGraphData.nodes || realGraphData.Nodes || [];
+        const rawLinks = realGraphData.links || realGraphData.Links || [];
+        const nodeMap = new Map();
+        
+        rawNodes.forEach(n => {
+           const id = n.id || n.Id || n._id || n.ID;
+           const type = n.type || n.Type || n.TYPE || "Node";
+           let color = n.color || n.Color || n.COLOR || "#8b949e";
 
-             if (type.toLowerCase() === 'domain' && color !== '#a371f7') {
-                 color = '#58a6ff'; 
-             }
+           if (type.toLowerCase() === 'domain' && color !== '#a371f7') {
+               color = '#58a6ff'; 
+           }
 
-             if (id) {
-                nodeMap.set(id, {
-                   ...n,
-                   id: id,
-                   name: n.name || n.Name || n.NAME || "Unknown",
-                   type: type,
-                   val: Number(n.val || n.Val || n.VAL) || 5,
-                   color: color
-                });
-             }
-          });
-          const safeNodes = Array.from(nodeMap.values());
+           if (id) {
+              nodeMap.set(id, {
+                 ...n,
+                 id: id,
+                 name: n.name || n.Name || n.NAME || "Unknown",
+                 type: type,
+                 val: Number(n.val || n.Val || n.VAL) || 5,
+                 color: color
+              });
+           }
+        });
 
-          const safeLinks = rawLinks.map(l => ({
-             ...l,
-             source: l.source || l.Source || l.SOURCE || l._from,
-             target: l.target || l.Target || l.TARGET || l._to,
-             name: l.name || l.Name || l.NAME || ""
-          })).filter(l => l.source && l.target && nodeMap.has(l.source) && nodeMap.has(l.target));
+        const safeNodes = Array.from(nodeMap.values());
+        const safeLinks = rawLinks.map(l => ({
+           ...l,
+           source: l.source || l.Source || l.SOURCE || l._from,
+           target: l.target || l.Target || l.TARGET || l._to,
+           name: l.name || l.Name || l.NAME || ""
+        })).filter(l => l.source && l.target && nodeMap.has(l.source) && nodeMap.has(l.target));
 
-          setGraphData({ nodes: safeNodes, links: safeLinks });
-        }
+        setGraphData({ nodes: safeNodes, links: safeLinks });
       }
-
-    } catch(error){
-      alert("Không thể kết nối đến Backend!");
-    } finally{
+    } catch(error) {
+      if (error.response && error.response.status === 404) {
+        alert("Không tìm thấy dấu vết mã độc này!");
+      } else {
+        console.error("Lỗi kết nối:", error);
+        alert("Lỗi kết nối đến Backend! Kiểm tra lại cấu hình.");
+      }
+    } finally {
       setIsLoading(false);
     }
   };
 
-  const handleExportPDF = async () =>{
-    if(!searchResult) return;
-    setIsExporting(true);
+  const handleNodeRightClick = useCallback(async (node) => {
+    const nodeKey = String(node.id).includes('/') ? node.id.split('/')[1] : node.id;
+    const currentSkip = expandStatsRef.current[nodeKey] || 0;
 
-    try{
-      const pdf = new jsPDF('p','mm', 'a4');
-
-      // Tiêu đề
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(22);
-      pdf.setTextColor(220, 38, 38); 
-      pdf.text("BAO CAO PHAN TICH MA DOC", 105, 20, { align: "center" });
-
-      // Chi tiết
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(12);
-      pdf.setTextColor(0, 0, 0);
+    try {
+      const response = await axiosClient.get(`/Graph/expand/${nodeKey}?skip=${currentSkip}`);
+      const expandedData = response.data;
       
-      let currentY = 40;
-      const lineSpacing = 8;
+      const newNodes = expandedData.nodes || expandedData.Nodes || [];
+      const newLinks = expandedData.links || expandedData.Links || [];
 
-      pdf.text(`Ten ma doc: ${searchResult.iocValue}`, 20, currentY); currentY += lineSpacing;
-      pdf.text(`Loai: ${searchResult.type}`, 20, currentY); currentY += lineSpacing;
-      pdf.text(`Diem rui ro: ${searchResult.riskScore}/100`, 20, currentY); currentY += lineSpacing;
-      pdf.text(`Quoc gia: ${searchResult.country}`, 20, currentY); currentY += lineSpacing;
-      pdf.text(`Nguon tao: ${searchResult.asn}`, 20, currentY); currentY += lineSpacing;
-      
-      currentY += 10;
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Danh sach cac IOC lien doi (Visual Graph):", 20, currentY);
-
-      // Chụp ảnh Graph   
-      const graphElement = document.querySelector('.graph-panel');
-      if (graphElement) {
-        const canvas = await html2canvas(graphElement, {
-          scale: 2,
-          backgroundColor: '#0f172a',
-          useCORS: true
-        });
-        
-        const imgData = canvas.toDataURL('image/png');
-        const imgWidth = 170; 
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        
-        // Chèn ảnh vào PDF
-        pdf.addImage(imgData, 'PNG', 20, currentY + 5, imgWidth, imgHeight);
+      if (newNodes.length === 0) {
+        alert("Node này đã hiển thị hết toàn bộ dữ liệu liên quan!");
+        return;
       }
 
-      pdf.save(`NexusTIP_Report_${searchResult.iocValue}.pdf`);
+      expandStatsRef.current[nodeKey] = currentSkip + 30;
 
-    } catch (err) {
-      console.error("Lỗi xuất PDF:", err);
-      alert("Lỗi khi tạo file PDF!");
-    } finally {
-      setIsExporting(false);
+      setGraphData(prevData => {
+        const existingNodeIds = new Set(prevData.nodes.map(n => n.id));
+        
+        const uniqueNewNodes = newNodes
+          .filter(n => n.id && !existingNodeIds.has(n.id))
+          .map(n => {
+            let color = n.color || "#8b949e";
+            if ((n.type || "").toLowerCase() === 'domain' && color !== '#a371f7') color = '#58a6ff';
+            
+            return {
+              ...n,
+              name: n.name || "Unknown",
+              val: Number(n.val) || 5,
+              color: color,
+              x: node.x, 
+              y: node.y 
+            };
+          });
+
+        if(uniqueNewNodes.length === 0){
+             alert("Các nhánh mở rộng đều đã có mặt trên bản đồ!");
+             return prevData;
+        }
+
+        const getLinkId = (link) => {
+          const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+          const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+          return `${sourceId}->${targetId}`;
+        };
+
+        const existingLinkIds = new Set(prevData.links.map(getLinkId));
+        const uniqueNewLinks = newLinks
+          .map(l => ({
+            ...l,
+            source: l.source || l._from,
+            target: l.target || l._to
+          }))
+          .filter(l => l.source && l.target && !existingLinkIds.has(`${l.source}->${l.target}`));
+
+        return {
+          nodes: [...prevData.nodes, ...uniqueNewNodes],
+          links: [...prevData.links, ...uniqueNewLinks]
+        };
+      });
+      
+    } catch (error) {
+      console.error("Lỗi khi mở rộng:", error);
     }
+  }, []);
+
+  const handleExportPDF = async () =>{
+      if(!searchResult) return;
+      setIsExporting(true);
+      try{
+        const pdf = new jsPDF('p','mm', 'a4');
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(22);
+        pdf.setTextColor(220, 38, 38); 
+        pdf.text("BAO CAO PHAN TICH MA DOC", 105, 20, { align: "center" });
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(12);
+        pdf.setTextColor(0, 0, 0);
+        
+        let currentY = 40;
+        const lineSpacing = 8;
+        pdf.text(`Ten ma doc: ${searchResult.iocValue}`, 20, currentY); currentY += lineSpacing;
+        pdf.text(`Loai: ${searchResult.type}`, 20, currentY); currentY += lineSpacing;
+        pdf.text(`Diem rui ro: ${searchResult.riskScore}/100`, 20, currentY); currentY += lineSpacing;
+        pdf.text(`Quoc gia: ${searchResult.country}`, 20, currentY); currentY += lineSpacing;
+        pdf.text(`Nguon tao: ${searchResult.asn}`, 20, currentY); currentY += lineSpacing;
+        
+        currentY += 10;
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Danh sach cac IOC lien doi (Visual Graph):", 20, currentY);
+  
+        const graphElement = document.querySelector('.graph-panel');
+        if (graphElement) {
+          const canvas = await html2canvas(graphElement, { scale: 2, backgroundColor: '#0f172a', useCORS: true });
+          const imgData = canvas.toDataURL('image/png');
+          const imgWidth = 170; 
+          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+          pdf.addImage(imgData, 'PNG', 20, currentY + 5, imgWidth, imgHeight);
+        }
+        pdf.save(`NexusTIP_Report_${searchResult.iocValue}.pdf`);
+      } catch (err) {
+        alert("Lỗi khi tạo file PDF!");
+      } finally {
+        setIsExporting(false);
+      }
   };
 
   return (
@@ -159,69 +224,37 @@ function SearchPage(){
       <div className="search-header">
         <h1 className="search-title">Tra cứu Dấu vết Tấn công (IOC)</h1>
         <p className="search-subtitle">Hệ thống phân tích thông minh</p>
-        
         <form className="search-input-group" onSubmit={handleSearch}>
-          <input 
-            type="text" 
-            className="search-input"
-            placeholder="Nhập IP, Domain, hoặc Hash..." 
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)} 
-          />
-          <button type="submit" className="btn-search" disabled={isLoading}>
-            {isLoading ? 'Đang quét...' : 'Truy vết 🔍'}
-          </button>
+          <input type="text" className="search-input" placeholder="Nhập IP, Domain, hoặc Hash..." value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
+          <button type="submit" className="btn-search" disabled={isLoading}>{isLoading ? 'Đang quét...' : 'Truy vết 🔍'}</button>
         </form>
       </div>
 
       {searchResult && (
         <div className="result-container">
-          
           <div className="info-panel">
             <h2 className="info-title">Chi tiết Tâm điểm</h2>
-            <button 
-                    onClick={handleExportPDF} 
-                    disabled={isExporting}
-                    style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
-                    {isExporting ? 'Đang xuất...' : '📄 Xuất PDF'}
-            </button>
-            <div className="info-row">
-              <span className="info-label">Giá trị:</span>
-              <strong className="info-value-large">{searchResult.iocValue}</strong>
-            </div>
-            <div className="info-row">
-              <span className="info-label">Loại:</span>
-              <span>{searchResult.type}</span>
-            </div>
-            <div className="info-row">
-              <span className="info-label">Điểm Rủi ro:</span>
-              <strong className="info-risk-high">{searchResult.riskScore} / 100</strong>
-            </div>
-            <div className="info-row">
-              <span className="info-label">Quốc gia & Nguồn:</span>
-              <span>{searchResult.country} - {searchResult.asn}</span>
-            </div>
+            <button onClick={handleExportPDF} disabled={isExporting} style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>{isExporting ? 'Đang xuất...' : '📄 Xuất PDF'}</button>
+            <div className="info-row"><span className="info-label">Giá trị:</span><strong className="info-value-large">{searchResult.iocValue}</strong></div>
+            <div className="info-row"><span className="info-label">Loại:</span><span>{searchResult.type}</span></div>
+            <div className="info-row"><span className="info-label">Điểm Rủi ro:</span><strong className="info-risk-high">{searchResult.riskScore} / 100</strong></div>
+            <div className="info-row"><span className="info-label">Quốc gia & Nguồn:</span><span>{searchResult.country} - {searchResult.asn}</span></div>
           </div>
 
           <div className="graph-panel" style={{ overflow: 'hidden', position: 'relative' }}>
              
-             {/* Bảng chú giải */}
              <div style={{ position: 'absolute', top: 15, left: 15, background: 'rgba(22, 27, 34, 0.8)', padding: '10px 15px', borderRadius: 8, border: '1px solid #30363d', fontSize: 13, zIndex: 10, textAlign: 'left' }}>
                 <div style={{fontWeight: 'bold', marginBottom: 8, color: '#c9d1d9'}}>Mức độ rủi ro (Risk)</div>
                 <div style={{color: '#a371f7', marginBottom: 4}}>🟣 Tâm điểm tra cứu</div>
                 <div style={{color: '#58a6ff', marginBottom: 4}}>🔵 Domain (Tên miền)</div>
                 <div style={{color: '#ff7b72', marginBottom: 4}}>🔴 Cao (&ge; 80)</div>
                 <div style={{color: '#d29922', marginBottom: 4}}>🟡 Cảnh báo (&ge; 50)</div>
-                <div style={{color: '#238636'}}>🟢 An toàn (&lt; 50)</div>
+                <div style={{color: '#238636', marginBottom: 8}}>🟢 An toàn (&lt; 50)</div>
+                <div style={{borderTop: '1px dashed #555', paddingTop: 8, color: '#ffeb3b', fontStyle: 'italic'}}>🖱️ Click chuột phải vào Node<br/>để mở rộng bản đồ</div>
              </div>
 
              {selectedNode && (
-                <div style={{ 
-                    position: 'absolute', top: 15, right: 15, background: 'rgba(15, 23, 42, 0.95)', 
-                    padding: '15px 20px', borderRadius: '10px', border: '1px solid #38bdf8', 
-                    fontSize: '14px', zIndex: 20, textAlign: 'left', minWidth: '220px',
-                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
-                }}>
+                <div style={{ position: 'absolute', top: 15, right: 15, background: 'rgba(15, 23, 42, 0.95)', padding: '15px 20px', borderRadius: '10px', border: '1px solid #38bdf8', fontSize: '14px', zIndex: 20, textAlign: 'left', minWidth: '220px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #334155', paddingBottom: '8px', marginBottom: '12px' }}>
                         <strong style={{ color: '#38bdf8' }}>Chi tiết Node</strong>
                         <button onClick={() => setSelectedNode(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold' }}>X</button>
@@ -234,51 +267,63 @@ function SearchPage(){
 
              {graphData.nodes.length > 0 ? (
                <ForceGraph2D
+                  ref={fgRef} // ĐÃ CẬP NHẬT REF
                   graphData={graphData}
                   width={700}
                   height={500}
-                  linkColor={() => 'rgba(255, 255, 255, 0.3)'}
+                  linkColor={() => 'rgba(255, 255, 255, 0.2)'}
                   linkWidth={1.5}
-                  linkLabel="name" 
+                  linkLabel="" // ĐÃ TẮT LABEL CỦA DÂY NỐI
                   linkDirectionalArrowLength={4}
                   linkDirectionalArrowRelPos={1}
-
                   onNodeClick={(node) => setSelectedNode(node)} 
+                  onNodeRightClick={handleNodeRightClick} 
+                  
+                  // ĐÃ THÊM SỰ KIỆN HOVER CHUỘT
+                  onNodeHover={node => setHoverNode(node)}
 
                   nodeCanvasObject={(node, ctx, globalScale) => {
                     try {
-                      const x = node.x || 0;
-                      const y = node.y || 0;
+                      const x = node.x || 0; 
+                      const y = node.y || 0; 
                       const radius = node.val + 2;
-                      const label = `[${node.type}] ${node.name}`;
-                      const fontSize = 12 / globalScale;
                       
-                      ctx.font = `${fontSize}px Sans-Serif`;
-                      
-                      ctx.beginPath();
+                      ctx.beginPath(); 
                       ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
-                      ctx.fillStyle = node.color;
+                      ctx.fillStyle = node.color; 
                       ctx.fill();
-                      
-                      ctx.lineWidth = node.color === '#a371f7' ? 2 : 1;
-                      ctx.strokeStyle = '#ffffff';
+                      ctx.lineWidth = node.color === '#a371f7' ? 2 : 1; 
+                      ctx.strokeStyle = '#ffffff'; 
                       ctx.stroke();
 
                       if (selectedNode && selectedNode.id === node.id) {
-                          ctx.beginPath();
+                          ctx.beginPath(); 
                           ctx.arc(x, y, radius + 3, 0, 2 * Math.PI, false);
-                          ctx.strokeStyle = '#38bdf8';
-                          ctx.lineWidth = 2;
+                          ctx.strokeStyle = '#38bdf8'; 
+                          ctx.lineWidth = 2; 
                           ctx.stroke();
                       }
 
-                      ctx.textAlign = 'center';
-                      ctx.textBaseline = 'top';
-                      ctx.fillStyle = '#c9d1d9'; 
-                      ctx.fillText(label, x, y + radius + 4);
-                    } catch (err) {
-                      console.error("Lỗi vẽ canvas:", err);
-                    }
+                      // ĐÃ CẬP NHẬT THUẬT TOÁN GIẤU CHỮ (Chỉ hiện khi hover, select hoặc zoom to)
+                      const isHovered = hoverNode && hoverNode.id === node.id;
+                      const isSelected = selectedNode && selectedNode.id === node.id;
+                      const isZoomedIn = globalScale > 2.5;
+
+                      if (isHovered || isSelected || isZoomedIn) {
+                          const label = `[${node.type}] ${node.name}`;
+                          const fontSize = 12 / globalScale; 
+                          ctx.font = `${fontSize}px Sans-Serif`;
+                          ctx.textAlign = 'center'; 
+                          ctx.textBaseline = 'top'; 
+                          
+                          ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+                          const textWidth = ctx.measureText(label).width;
+                          ctx.fillRect(x - textWidth/2 - 2, y + radius + 2, textWidth + 4, fontSize + 4);
+
+                          ctx.fillStyle = isHovered ? '#38bdf8' : '#c9d1d9';
+                          ctx.fillText(label, x, y + radius + 4);
+                      }
+                    } catch (err) {}
                   }}
                />
              ) : (

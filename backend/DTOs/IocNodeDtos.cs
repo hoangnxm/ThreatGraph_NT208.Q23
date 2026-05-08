@@ -28,7 +28,7 @@ namespace IocNodes.DTOs
         public List<string>? Tags { get; set; }
 
         [Required]
-        public string OriginRef { get; set; } = string.Empty;
+        public string? OriginRef { get; set; } = string.Empty;
     }
 
     /// <summary>Payload for PUT /api/ioc-nodes/{id} — type and value are intentionally absent.</summary>

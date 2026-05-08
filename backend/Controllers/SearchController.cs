@@ -4,11 +4,12 @@ using backend.Models;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using NT208_Project.Controllers;
-
+using Microsoft.AspNetCore.Authorization;
 namespace NT208_Project.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class SearchController : ControllerBase
     {
         private readonly IArangoDBClient dbClient;

@@ -1,11 +1,13 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using IocNodes.Services;
+using Microsoft.AspNetCore.Authorization;
 
 namespace IocNodes.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Roles = "Admin")]
     public class DataFeedsController : ControllerBase
     {
         private readonly IDataFeedService _dataFeedService;
