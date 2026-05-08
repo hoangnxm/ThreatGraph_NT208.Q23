@@ -1,11 +1,12 @@
-﻿using System;
+﻿using backend.Models;
+using backend.Repositories;
+using IocNodes.DTOs;
+using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
-using IocNodes.DTOs;
-using backend.Repositories;
-using Microsoft.Extensions.Logging;
 
 namespace IocNodes.Services
 {
@@ -35,73 +36,78 @@ namespace IocNodes.Services
 
             try
             {
-                var response = await client.GetFromJsonAsync<OtxPulseResponse>("pulses/subscribed?limit=2");
+                // Quay về dùng subscribed, tăng limit lên 10 để kéo cho sướng
+                var response = await client.GetFromJsonAsync<OtxPulseResponse>("pulses/subscribed?limit=10");
                 if (response?.Results == null) return 0;
 
                 foreach (var pulse in response.Results)
                 {
-                    // --- BƯỚC 1: XỬ LÝ NODE CHIẾN DỊCH (NODE CHA) ---
+                    // --- BƯỚC 1: TẠO NODE CAMPAIGN CHA ---
                     string campaignKey = string.Empty;
-                    var existingCamp = await _iocRepo.GetByValueAsync(pulse.Name);
+                    string pulseName = string.IsNullOrWhiteSpace(pulse.Name) ? $"Campaign_{pulse.Id}" : pulse.Name;
 
-                    if (existingCamp != null && !string.IsNullOrEmpty(existingCamp.Key)) 
+                    var existingCamp = await _iocRepo.GetByValueAsync(pulseName);
+
+                    if (existingCamp != null && !string.IsNullOrEmpty(existingCamp.Key))
                     {
-                        campaignKey = existingCamp.Key; 
-                    } 
-                    else 
+                        campaignKey = existingCamp.Key;
+                    }
+                    else
                     {
-                        var campReq = new CreateIocNodeRequest {
-                            Type = "Campaign", 
-                            Value = pulse.Name, 
-                            RiskScore = 100, 
-                            OriginRef = "AlienVault OTX", 
-                            Tags = new List<string> { "Pulse", "Campaign" }
+                        var campReq = new CreateIocNodeRequest
+                        {
+                            Type = "Campaign",
+                            Value = pulseName,
+                            RiskScore = 90,
+                            OriginRef = "AlienVault OTX",
+                            Tags = new List<string> { "Pulse" }
                         };
-                        try {
+                        try
+                        {
                             var createdCamp = await _iocService.CreateAsync(campReq);
-                            campaignKey = createdCamp.Id; 
-                        } catch { continue; } 
+                            campaignKey = createdCamp.Id;
+                        }
+                        catch { continue; }
                     }
 
-                    // --- BƯỚC 2: XỬ LÝ NODE IOC (NODE CON) ---
-                    foreach (var indicator in pulse.Indicators)
-                    {
-                        var type = MapOtxTypeToSystemType(indicator.Type);
-                        if (type == null) continue;
+                    if (string.IsNullOrEmpty(campaignKey)) continue;
 
+                    // --- BƯỚC 2: QUÉT TRỰC TIẾP INDICATORS TỪ PULSE ---
+                    // (Không cần phải gọi API móc ruột nữa vì nó có sẵn rồi)
+                    foreach (var ind in pulse.Indicators)
+                    {
+                        var mappedType = MapOtxTypeToSystemType(ind.Type);
+                        if (mappedType == null) continue;
+
+                        string cleanValue = ind.Indicator.Trim();
                         string iocKey = string.Empty;
-                        string cleanValue = indicator.Indicator.Trim(); 
+
                         var existingIoc = await _iocRepo.GetByValueAsync(cleanValue);
 
-                        if (existingIoc != null && !string.IsNullOrEmpty(existingIoc.Key)) 
+                        if (existingIoc != null && !string.IsNullOrEmpty(existingIoc.Key))
                         {
                             iocKey = existingIoc.Key;
-                            var updateReq = new UpdateIocNodeRequest {
-                                RiskScore = 90, 
-                                Country = existingIoc.Country, 
-                                Tags = existingIoc.Tags ?? new List<string>(), 
-                                OriginRef = $"AlienVault OTX - {pulse.Name}"
-                            };
-                            if (!updateReq.Tags.Contains(pulse.Name)) updateReq.Tags.Add(pulse.Name);
-                            await _iocService.UpdateAsync(iocKey, updateReq);
-                        } 
-                        else 
+                        }
+                        else
                         {
-                            var iocReq = new CreateIocNodeRequest {
-                                Type = type, 
-                                Value = cleanValue, 
-                                RiskScore = 80, 
-                                OriginRef = $"AlienVault OTX - {pulse.Name}", 
+                            var iocReq = new CreateIocNodeRequest
+                            {
+                                Type = mappedType,
+                                Value = cleanValue,
+                                RiskScore = 70,
+                                OriginRef = "AlienVault OTX",
                                 Tags = new List<string> { "OTX", "AutoSync" }
                             };
-                            try {
+                            try
+                            {
                                 var createdIoc = await _iocService.CreateAsync(iocReq);
                                 iocKey = createdIoc.Id;
-                                addedCount++;
-                            } catch { continue; }
+                            }
+                            catch { continue; }
                         }
 
-                        if (!string.IsNullOrEmpty(iocKey) && !string.IsNullOrEmpty(campaignKey))
+                        // Nối đồ thị
+                        if (!string.IsNullOrEmpty(iocKey))
                         {
                             try
                             {
@@ -111,17 +117,9 @@ namespace IocNodes.Services
                                     relationType: "belongs_to",
                                     originRef: "AlienVault AutoSync"
                                 );
-                                _logger.LogInformation($"[Graph] Nối THÀNH CÔNG: {iocKey} -> {campaignKey}");
+                                addedCount++;
                             }
-                            catch (Exception ex)
-                            {
-                                _logger.LogError($"[Graph] Lỗi kết nối: {ex.Message}");
-                            }
-                        }
-                        else
-                        {
-                            // Camera chớp đỏ nếu C# lại bị mù ID
-                            _logger.LogWarning($"[Graph] LỖI ID RỖNG! iocKey: '{iocKey}', campaignKey: '{campaignKey}'");
+                            catch { } // Lỗi trùng lặp relationship thì bỏ qua
                         }
                     }
                 }
@@ -130,6 +128,8 @@ namespace IocNodes.Services
             {
                 _logger.LogError($"Lỗi cào dữ liệu: {ex.Message}");
             }
+
+            _logger.LogInformation($"[Sync] Đã kéo và nối thành công {addedCount} IOCs mới.");
             return addedCount;
         }
 
@@ -141,5 +141,7 @@ namespace IocNodes.Services
             if (type.Contains("hash") || type == "md5" || type == "sha1" || type == "sha256") return "Hash";
             return null;
         }
+
+
     }
 }

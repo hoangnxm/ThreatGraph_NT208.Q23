@@ -18,5 +18,6 @@ namespace IocNodes.Services
 
         // Khai báo hàm tạo liên kết giữa 2 node
         Task<bool> CreateRelationshipAsync(CreateRelationshipRequest request);
+
     }
 }
