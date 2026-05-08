@@ -65,7 +65,7 @@ namespace NT208_Project.Services
             logger.LogInformation("Checking And Creating Database....");
 
             // Khởi tạo DB
-            string databasename = "TIP";
+            string databasename = configuration["ArangoDB:Database"] ?? "TIP";
             try
             {
                 string dbUri = configuration["ArangoAdminSettings:ServerUri"] ?? "http://localhost:8529";
@@ -110,6 +110,7 @@ namespace NT208_Project.Services
                     );
 
                     logger.LogInformation($"Tạo mới thành công bảng {col.Name}");
+                    await Task.Delay(2000);
                 }
                 catch (ApiErrorException ex) when (ex.ApiError.ErrorNum == 1207)
                 {
