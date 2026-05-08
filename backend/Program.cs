@@ -13,7 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 // 1. Cấu hình CORS cho React
 builder.Services.AddCors(options => {
     options.AddPolicy("AllowReactApp", policy => {
-        policy.AllowAnyOrigin().AllowAnyHedear().AllowAnyMethod();
+        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
     });
 });
 
