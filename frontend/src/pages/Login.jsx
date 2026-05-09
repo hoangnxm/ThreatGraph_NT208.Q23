@@ -12,8 +12,8 @@ const Login = () => {
     const handleLogin = async (e) => {
         e.preventDefault();
         setError('');
+
         // VALIDATION MẬT KHẨU
-        // Cắt khoảng trắng dư thừa ở đầu và cuối (nếu người dùng lỡ bấm phím cách)
         const trimmedPassword = password.trim();
 
         // 1. Kiểm tra độ dài: Tối thiểu 6, tối đa 15 ký tự
@@ -22,33 +22,28 @@ const Login = () => {
             return;
         }
 
-        // 2. Kiểm tra độ phức tạp: Bắt buộc có chữ số
-        const complexPasswordRegex = /^(?=.*\d).+$/;
-        if (!complexPasswordRegex.test(trimmedPassword)) {
-            setError('Mật khẩu yếu! Yêu cầu chứa ít nhất 1 CHỮ SỐ.');
+        // 2. Kiểm tra độ phức tạp: Bắt buộc có chữ cái thường, chữ cái hoa và chữ số
+        const strongRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+        if (!strongRegex.test(trimmedPassword)) {
+            setError('Mật khẩu yếu! Yêu cầu chứa ít nhất 1 chữ cái thường, 1 chữ cái hoa và 1 chữ số.');
             return;
         }
-
-        // KẾT THÚC VALIDATION - BẮT ĐẦU GỌI API
         setIsLoading(true);
 
         try {
             // Gọi API Login
             const response = await axiosClient.post('/Auth/login', {
                 username: username,
-                password: trimmedPassword // Gửi pass đã gọt khoảng trắng
+                password: trimmedPassword
             });
-            
-            // Nếu Backend trả về token thành công
+
             if (response.data && response.data.token) {
-                localStorage.clear(); // Xóa token cũ trước khi đăng nhập mới
+                localStorage.clear();
                 localStorage.setItem('token', response.data.token);
 
-                // Chuyển hướng về trang Dashboard sau khi đăng nhập thành công
                 window.location.href = '/';
             }
         } catch (err) {
-            // Bắt lỗi từ Backend trả về (sai pass, tài khoản khóa...)
             if (err.response && err.response.data) {
                 setError(err.response.data.message || 'Lỗi xác thực từ Server!');
             } else {

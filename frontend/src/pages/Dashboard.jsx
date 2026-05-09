@@ -1,159 +1,102 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
-import { Doughnut } from 'react-chartjs-2';
+import { Pie } from 'react-chartjs-2';
+import { jwtDecode } from 'jwt-decode';
 
-// Đăng ký các thành phần của ChartJS
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 const Dashboard = () => {
-    const [stats, setStats] = useState({ TotalUsers: 0, TotalLogs: 0 });
+    const [stats, setStats] = useState({ TotalUsers: 0, TotalLogs: 0, TotalIocs: 0, IocsToday: 0, TotalEdges: 0, TopIps: [] });
     const [chartData, setChartData] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [userRole, setUserRole] = useState('');
+    const navigate = useNavigate();
 
     useEffect(() => {
-        const fetchDashboardData = async () => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            const decoded = jwtDecode(token);
+            setUserRole(decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] || decoded.role);
+        }
+
+        const fetchData = async () => {
             try {
-                // 1. Lấy Stats 
-                const resStats = await axiosClient.get('/Dashboard/stats');
-                setStats(resStats.data);
+                const res = await axiosClient.get('/Dashboard/stats');
+                setStats(res.data);
 
-                // 2. Lấy dữ liệu IOC
-                const resIoc = await axiosClient.get('/iocnodes/paged?limit=10000');
-                
-                console.log("Raw Data từ API IOC:", resIoc.data); 
+                // Giả lập dữ liệu Pie Chart từ IocNodes thực tế
+                const iocRes = await axiosClient.get('/iocnodes/paged?limit=1000');
+                const iocList = iocRes.data?.items || [];
+                const counts = { IP: 0, Domain: 0, Hash: 0 };
+                iocList.forEach(i => {
+                    if (i.Type === 'IP') counts.IP++;
+                    else if (i.Type === 'Domain') counts.Domain++;
+                    else counts.Hash++;
+                });
 
-                const iocData = resIoc.data;
-                const iocList = Array.isArray(iocData) ? iocData : 
-                                (iocData?.Result || iocData?.result || iocData?.items || iocData?.data || []);
-
-                console.log("Danh sách IOC sau khi lọc:", iocList);
-
-                if (iocList.length > 0) {
-                    const typeCounts = { IP: 0, Domain: 0, FileHash: 0, Other: 0 };
-                    
-                    iocList.forEach(item => {
-                        const type = String(item.Type || item.type || "").toUpperCase();
-                        if (type.includes('IP')) typeCounts.IP++;
-                        else if (type.includes('DOMAIN')) typeCounts.Domain++;
-                        else if (type.includes('HASH')) typeCounts.FileHash++;
-                        else typeCounts.Other++;
-                    });
-
-                    setChartData({
-                        labels: ['Địa chỉ IP', 'Tên miền (Domain)', 'Mã băm (FileHash)', 'Khác'],
-                        datasets: [{
-                            label: 'Số lượng dấu vết',
-                            data: [typeCounts.IP, typeCounts.Domain, typeCounts.FileHash, typeCounts.Other],
-                            backgroundColor: ['#3b82f6', '#a371f7', '#f59e0b', '#64748b'],
-                            borderColor: '#0f172a',
-                            borderWidth: 3,
-                            hoverOffset: 10
-                        }]
-                    });
-                } else {
-                    // Nếu list rỗng, vẫn setChartData về 0 để nó không bị null gây lỗi render
-                    setChartData({
-                        labels: ['Chưa có data'],
-                        datasets: [{ data: [0], backgroundColor: ['#64748b'] }]
-                    });
-                }
-
-            } catch (err) {
-                console.error("Lỗi lấy dữ liệu Dashboard:", err);
-            } finally {
-                setLoading(false);
-            }
+                setChartData({
+                    labels: ['IP', 'Domain', 'Hash'],
+                    datasets: [{
+                        data: [counts.IP, counts.Domain, counts.Hash],
+                        backgroundColor: ['#ef4444', '#3b82f6', '#f59e0b'],
+                        hoverOffset: 20
+                    }]
+                });
+            } catch (err) { console.error(err); }
         };
-
-        fetchDashboardData();
+        fetchData();
     }, []);
 
-    const chartOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'right',
-                labels: { color: '#e2e8f0', font: { size: 14 } }
-            }
-        }
-    };
-
-    if (loading) return <div style={loadingTextStyle}>Đang nạp dữ liệu phân tích hệ thống...</div>;
-
     return (
-        <div style={{ animation: 'fadeIn 0.5s' }}>
-            <h2 style={{ color: '#f8fafc', marginBottom: '20px', fontWeight: 'bold' }}>
-                📊 TỔNG QUAN HỆ THỐNG (IOC DASHBOARD)
-            </h2>
+        <div style={{ color: '#fff', padding: '20px' }}>
+            <h2>📊 HỆ THỐNG GIÁM SÁT IOC</h2>
 
-            {/* Các thẻ con số tổng quan[cite: 3] */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
-                <div style={cardStyle}>
-                    <div style={{ ...cardIconStyle, color: '#60a5fa', backgroundColor: '#1e3a8a' }}>👥</div>
-                    <div>
-                        <div style={cardLabelStyle}>TỔNG TÀI KHOẢN</div>
-                        <div style={cardValueStyle}>{stats.TotalUsers || stats.totalUsers || 0}</div>
-                    </div>
+            {/* CARD CHO ADMIN */}
+            {userRole === 'Admin' && (
+                <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
+                    <div style={adminCardStyle}>👥 Users: {stats.TotalUsers}</div>
+                    <div style={adminCardStyle}>📜 Logs: {stats.TotalLogs}</div>
                 </div>
+            )}
 
-                <div style={{ ...cardStyle, borderLeft: '4px solid #ef4444' }}>
-                    <div style={{ ...cardIconStyle, color: '#ef4444', backgroundColor: '#7f1d1d' }}>📜</div>
-                    <div>
-                        <div style={cardLabelStyle}>SỰ KIỆN BẢO MẬT (LOGS)</div>
-                        <div style={cardValueStyle}>{stats.TotalLogs || stats.totalLogs || 0}</div>
-                    </div>
-                </div>
+            {/* 3 CARD CHO MỌI USER */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
+                <div style={userCardStyle}>🦠 Tổng IOC: {stats.TotalIocs}</div>
+                <div style={userCardStyle}>🔥 Thêm hôm nay: {stats.IocsToday}</div>
+                <div style={userCardStyle}>🕸️ Edges: {stats.TotalEdges}</div>
             </div>
-            
-            {/* Biểu đồ Doughnut duy nhất tập trung vào IOC[cite: 1, 3] */}
-            <div style={chartContainerStyle}>
-                <h3 style={chartTitleStyle}>
-                    Phân bổ các loại dấu vết mã độc (IOC Types)
-                </h3>
-                
-                <div style={{ height: '350px', display: 'flex', justifyContent: 'center' }}>
-                    {chartData && chartData.datasets[0].data.some(val => val > 0) ? (
-                        <Doughnut data={chartData} options={chartOptions} />
-                    ) : (
-                        <div style={{ color: '#64748b', alignSelf: 'center' }}>
-                            Chưa có dữ liệu IOC. Hãy thêm mới IP/Domain/Hash để xem phân tích.
-                        </div>
-                    )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginTop: '30px' }}>
+                <div style={chartBoxStyle}>
+                    <h3>Tỉ lệ mã độc</h3>
+                    <div style={{ height: '250px' }}>
+                        {chartData && <Pie data={chartData} options={{ maintainAspectRatio: false }} />}
+                    </div>
+                </div>
+
+                <div style={chartBoxStyle}>
+                    <h3>Top 10 IP Nguy Hiểm</h3>
+                    <table style={{ width: '100%', textAlign: 'left' }}>
+                        <thead><tr><th>IP</th><th>Nguồn</th></tr></thead>
+                        <tbody>
+                            {stats.TopIps.map((ip, i) => (
+                                <tr key={i} onClick={() => navigate(`/search?query=${ip.Value}`)} style={{ cursor: 'pointer' }}>
+                                    <td style={{ color: '#ef4444' }}>{ip.Value}</td>
+                                    <td>{ip.Source}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     );
 };
 
-// --- CSS Objects (Giữ nguyên phong cách UIT) ---
-const loadingTextStyle = { color: '#38bdf8', padding: '20px', fontStyle: 'italic', textAlign: 'center' };
-const cardStyle = {
-    backgroundColor: '#0f172a', padding: '25px', borderRadius: '12px',
-    border: '1px solid #1e293b', borderLeft: '4px solid #3b82f6', 
-    display: 'flex', alignItems: 'center', gap: '20px',
-    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.5)'
-};
-const cardIconStyle = { fontSize: '2rem', padding: '15px', borderRadius: '12px' };
-const cardLabelStyle = { color: '#94a3b8', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '5px' };
-const cardValueStyle = { color: '#f8fafc', fontSize: '2rem', fontWeight: 'bold' };
-
-const chartContainerStyle = { 
-    backgroundColor: '#1e293b', 
-    padding: '30px', 
-    borderRadius: '16px', 
-    marginTop: '30px',
-    border: '1px solid #334155',
-    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.4)'
-};
-const chartTitleStyle = { 
-    color: '#94a3b8', 
-    marginBottom: '25px', 
-    textAlign: 'center', 
-    textTransform: 'uppercase', 
-    fontSize: '0.9rem',
-    letterSpacing: '1px'
-};
+// Style tạm thời
+const adminCardStyle = { background: '#1e293b', padding: '20px', borderRadius: '10px', flex: 1, borderLeft: '5px solid #3b82f6' };
+const userCardStyle = { background: '#0f172a', padding: '30px', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', border: '1px solid #334155' };
+const chartBoxStyle = { background: '#0f172a', padding: '20px', borderRadius: '15px' };
 
 export default Dashboard;
