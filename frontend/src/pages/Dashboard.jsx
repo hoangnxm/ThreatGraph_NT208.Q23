@@ -8,7 +8,9 @@ import { jwtDecode } from 'jwt-decode';
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 const Dashboard = () => {
-    const [stats, setStats] = useState({ TotalUsers: 0, TotalLogs: 0, TotalIocs: 0, IocsToday: 0, TotalEdges: 0, TopIps: [] });
+    const [stats, setStats] = useState({ 
+        totalUsers: 0, totalLogs: 0, totalIocs: 0, iocsToday: 0, totalEdges: 0, topIps: [] 
+    });
     const [chartData, setChartData] = useState(null);
     const [userRole, setUserRole] = useState('');
     const navigate = useNavigate();
@@ -23,15 +25,23 @@ const Dashboard = () => {
         const fetchData = async () => {
             try {
                 const res = await axiosClient.get('/Dashboard/stats');
-                setStats(res.data);
+                setStats({
+                    totalUsers: res.data.totalUsers ?? res.data.TotalUsers ?? 0,
+                    totalLogs: res.data.totalLogs ?? res.data.TotalLogs ?? 0,
+                    totalIocs: res.data.totalIocs ?? res.data.TotalIocs ?? 0,
+                    iocsToday: res.data.iocsToday ?? res.data.IocsToday ?? 0,
+                    totalEdges: res.data.totalEdges ?? res.data.TotalEdges ?? 0,
+                    topIps: res.data.topIps ?? res.data.TopIps ?? []
+                });
 
                 // Giả lập dữ liệu Pie Chart từ IocNodes thực tế
                 const iocRes = await axiosClient.get('/iocnodes/paged?limit=1000');
                 const iocList = iocRes.data?.items || [];
                 const counts = { IP: 0, Domain: 0, Hash: 0 };
                 iocList.forEach(i => {
-                    if (i.Type === 'IP') counts.IP++;
-                    else if (i.Type === 'Domain') counts.Domain++;
+                    const type = i.type || i.Type;  
+                    if (type === 'IP') counts.IP++;
+                    else if (type === 'Domain') counts.Domain++;
                     else counts.Hash++;
                 });
 
