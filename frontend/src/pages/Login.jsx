@@ -41,7 +41,7 @@ const Login = () => {
                 localStorage.clear();
                 localStorage.setItem('token', response.data.token);
 
-                window.location.href = '/';
+                window.location.href = '/#/';
             }
         } catch (err) {
             if (err.response && err.response.data) {
