@@ -18,7 +18,7 @@ const Login = () => {
             // Gọi API Login
             const response = await axiosClient.post('/Auth/login', {
                 username: username,
-                password: trimmedPassword
+                password: password
             });
 
             if (response.data && response.data.token) {
