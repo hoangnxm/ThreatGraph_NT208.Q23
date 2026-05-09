@@ -15,7 +15,7 @@ function App() {
   useEffect(() => {
     const syncLogout = (event) => {
       if (event.key === 'token' && event.newValue === null) {
-        window.location.href = '/#/login'; 
+        window.location.href = '/login'; 
       }
     };
 

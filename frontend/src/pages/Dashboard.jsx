@@ -3,7 +3,7 @@ import axiosClient from '../api/axiosClient';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
 
-// Đăng ký các thành phần của ChartJS[cite: 3]
+// Đăng ký các thành phần của ChartJS
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 const Dashboard = () => {
