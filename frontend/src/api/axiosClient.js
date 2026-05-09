@@ -2,6 +2,7 @@ import axios from 'axios';
 
 const axiosClient = axios.create({
     baseURL: import.meta.env.VITE_API_URL || "http://20.196.128.188:7193/api",
+    // baseURL: import.meta.env.VITE_API_URL || "https://localhost:7193/api",
     headers: { 'Content-Type': 'application/json' }
 });
 

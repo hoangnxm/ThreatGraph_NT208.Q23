@@ -115,5 +115,8 @@ app.UseAuthorization();
 // 4. Đăng ký Middleware ghi Log
 app.UseMiddleware<AuditLogMiddleware>();
 
+// 5. Đăng ký Middleware kiểm tra trạng thái user
+app.UseMiddleware<NT208_Project.Middlewares.UserStatusMiddleware>();
+
 app.MapControllers();
 app.Run();

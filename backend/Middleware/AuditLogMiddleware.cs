@@ -31,9 +31,23 @@ namespace NT208_Project.Middlewares
                 }
 
                 var username = context.User.FindFirst(ClaimTypes.Name)?.Value ?? "System";
-                
+
                 // Bắt IP thật
-                var ip = context.Connection.RemoteIpAddress?.ToString() ?? "Unknown IP";
+                var ipAddress = context.Connection.RemoteIpAddress;
+                string ip = "Unknown IP";
+
+                if (ipAddress != null)
+                {
+                    if (ipAddress.IsIPv4MappedToIPv6)
+                    {
+                        ip = ipAddress.MapToIPv4().ToString();
+                    }
+                    else
+                    {
+                        ip = ipAddress.ToString();
+                    }
+                }
+
                 if (ip == "::1") ip = "127.0.0.1";
 
                 var logEntry = new {

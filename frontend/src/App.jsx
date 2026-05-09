@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { jwtDecode } from 'jwt-decode'; // BẮT BUỘC phải có dòng này
+import { jwtDecode } from 'jwt-decode'; 
 import MainLayout from './layouts/MainLayout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -8,9 +8,20 @@ import AuditLogList from './pages/AuditLogList';
 import SearchPage from './pages/SearchPage/SearchPage';
 import IocManagement from './pages/IocManagement';
 import DataFeeds from './pages/DataFeeds';
+import { useEffect } from 'react';
 
 function App() {
   const token = localStorage.getItem('token');
+  useEffect(() => {
+    const syncLogout = (event) => {
+      if (event.key === 'token' && event.newValue === null) {
+        window.location.href = '/login'; 
+      }
+    };
+
+    window.addEventListener('storage', syncLogout);
+    return () => window.removeEventListener('storage', syncLogout);
+  }, []);
   const getRoleFromToken = () => {
     if (!token) return null;
     try {
