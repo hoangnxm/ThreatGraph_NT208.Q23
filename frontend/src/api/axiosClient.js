@@ -23,7 +23,7 @@ axiosClient.interceptors.response.use(
             // LỖI 401: Token hết hạn hoặc không hợp lệ -> Xóa token và redirect về login
             if (error.response.status === 401) {
                 localStorage.removeItem('token');
-                window.location.href = '/login';
+                window.location.href = '/#/login';
             }
             // LỖI 403: Không có quyền -> Hiển thị cảnh báo nhưng KHÔNG xóa token, KHÔNG redirect
             else if (error.response.status === 403) {
