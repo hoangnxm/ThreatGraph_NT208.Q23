@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode'; 
 import MainLayout from './layouts/MainLayout';
 import Login from './pages/Login';
@@ -15,7 +15,7 @@ function App() {
   useEffect(() => {
     const syncLogout = (event) => {
       if (event.key === 'token' && event.newValue === null) {
-        window.location.href = '/#/login'; 
+        window.location.href = '/login'; 
       }
     };
 

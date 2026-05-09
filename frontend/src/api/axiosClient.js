@@ -13,19 +13,22 @@ axiosClient.interceptors.request.use((config) => {
     return config;
 });
 
-// Xử lý lỗi 401 và 403
+// Xử lý lỗi 401 và 403 toàn cục
 axiosClient.interceptors.response.use(
     (response) => {
         return response;
     },
     (error) => {
+        // Trích xuất thêm config để biết đường link API nào vừa gọi bị lỗi
+        const originalRequest = error.config;
+
         if (error.response) {
-            // LỖI 401: Token hết hạn hoặc không hợp lệ -> Xóa token và redirect về login
-            if (error.response.status === 401) {
+            // LỖI 401: Token hết hạn hoặc không hợp lệ, chỉ redirect nếu không phải đang gọi API login
+            if (error.response.status === 401 && originalRequest.url !== '/Auth/login') {
                 localStorage.removeItem('token');
-                window.location.href = '/#/login';
+                window.location.href = '/login';
             }
-            // LỖI 403: Không có quyền -> Hiển thị cảnh báo nhưng KHÔNG xóa token, KHÔNG redirect
+            // LỖI 403: Người dùng không có quyền truy cập tài nguyên
             else if (error.response.status === 403) {
                 alert("Bạn không có quyền thực hiện chức năng hoặc xem nội dung này!");
             }
@@ -33,5 +36,4 @@ axiosClient.interceptors.response.use(
         return Promise.reject(error);
     }
 );
-
 export default axiosClient;

@@ -12,22 +12,6 @@ const Login = () => {
     const handleLogin = async (e) => {
         e.preventDefault();
         setError('');
-
-        // VALIDATION MẬT KHẨU
-        const trimmedPassword = password.trim();
-
-        // 1. Kiểm tra độ dài: Tối thiểu 6, tối đa 15 ký tự
-        if (trimmedPassword.length < 6 || trimmedPassword.length > 15) {
-            setError('Mật khẩu phải từ 6 đến 15 ký tự. Không được nhập quá ngắn!');
-            return;
-        }
-
-        // 2. Kiểm tra độ phức tạp: Bắt buộc có chữ cái thường, chữ cái hoa và chữ số
-        const strongRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-        if (!strongRegex.test(trimmedPassword)) {
-            setError('Mật khẩu yếu! Yêu cầu chứa ít nhất 1 chữ cái thường, 1 chữ cái hoa và 1 chữ số.');
-            return;
-        }
         setIsLoading(true);
 
         try {
