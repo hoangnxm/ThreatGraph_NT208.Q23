@@ -10,16 +10,35 @@ const Login = () => {
     const navigate = useNavigate();
 
     const handleLogin = async (e) => {
-        e.preventDefault(); // Chặn hành vi load lại trang mặc định của Form
+        e.preventDefault();
         setError('');
+        // VALIDATION MẬT KHẨU
+        // Cắt khoảng trắng dư thừa ở đầu và cuối (nếu người dùng lỡ bấm phím cách)
+        const trimmedPassword = password.trim();
+
+        // 1. Kiểm tra độ dài: Tối thiểu 6, tối đa 15 ký tự
+        if (trimmedPassword.length < 6 || trimmedPassword.length > 15) {
+            setError('Mật khẩu phải từ 6 đến 15 ký tự. Không được nhập quá ngắn!');
+            return;
+        }
+
+        // 2. Kiểm tra độ phức tạp: Bắt buộc có chữ số
+        const complexPasswordRegex = /^(?=.*\d).+$/;
+        if (!complexPasswordRegex.test(trimmedPassword)) {
+            setError('Mật khẩu yếu! Yêu cầu chứa ít nhất 1 CHỮ SỐ.');
+            return;
+        }
+
+        // KẾT THÚC VALIDATION - BẮT ĐẦU GỌI API
         setIsLoading(true);
 
         try {
-            // Gọi API Login (đường dẫn này tự động cộng vào baseURL trong axiosClient)
+            // Gọi API Login
             const response = await axiosClient.post('/Auth/login', {
                 username: username,
-                password: password
+                password: trimmedPassword // Gửi pass đã gọt khoảng trắng
             });
+            
             // Nếu Backend trả về token thành công
             if (response.data && response.data.token) {
                 localStorage.clear(); // Xóa token cũ trước khi đăng nhập mới
@@ -99,12 +118,12 @@ const containerStyle = {
     justifyContent: 'center',
     alignItems: 'center',
     height: '100vh',
-    backgroundColor: '#020617', // Đen sâu
+    backgroundColor: '#020617',
     fontFamily: 'sans-serif'
 };
 
 const cardStyle = {
-    backgroundColor: '#0f172a', // Xanh đen
+    backgroundColor: '#0f172a',
     padding: '40px',
     borderRadius: '16px',
     boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px 0 rgba(59, 130, 246, 0.2)', // Có tí glow xanh
@@ -135,7 +154,7 @@ const inputStyle = {
 };
 
 const errorStyle = {
-    backgroundColor: '#7f1d1d', // Đỏ đô
+    backgroundColor: '#7f1d1d',
     color: '#fecaca',
     padding: '10px 15px',
     borderRadius: '8px',
@@ -147,7 +166,7 @@ const errorStyle = {
 const btnStyle = {
     width: '100%',
     padding: '14px',
-    backgroundColor: '#2563eb', // Xanh dương
+    backgroundColor: '#2563eb', 
     color: 'white',
     border: 'none',
     borderRadius: '8px',
