@@ -25,7 +25,7 @@ const Login = () => {
                 localStorage.clear();
                 localStorage.setItem('token', response.data.token);
 
-                window.location.href = '/'; // Redirect về Dashboard sau khi login thành công
+                window.location.href = '/'; // Redirect về trang Dashboard sau khi đăng nhập thành công
             }
             else {
                 setError('Đăng nhập thất bại! Vui lòng kiểm tra lại thông tin.');
