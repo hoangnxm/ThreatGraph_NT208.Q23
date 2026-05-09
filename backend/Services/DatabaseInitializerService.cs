@@ -25,7 +25,7 @@ namespace NT208_Project.Services
             try
             {
                 string adminUser = configuration["ArangoAdminSettings:DefaultAdminUser"] ?? "admin";
-                string adminPass = configuration["ArangoAdminSettings:DefaultAdminPassword"] ?? "admin123";
+                string adminPass = configuration["ArangoAdminSettings:DefaultAdminPassword"] ?? "Admin123";
 
                 // Kiểm tra database đã có Admin chưa
                 var cursor = await dbClient.Cursor.PostCursorAsync<dynamic>(new PostCursorBody
