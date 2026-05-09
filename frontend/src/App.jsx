@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode'; 
 import MainLayout from './layouts/MainLayout';
 import Login from './pages/Login';
@@ -35,7 +35,7 @@ function App() {
   const role = getRoleFromToken();
 
   return (
-    <HashRouter>
+    <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
         
@@ -62,7 +62,7 @@ function App() {
           />
         </Route>
       </Routes>
-    </HashRouter>
+    </BrowserRouter>
   );
 }
 export default App;
