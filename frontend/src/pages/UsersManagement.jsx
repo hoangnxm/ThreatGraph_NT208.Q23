@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
+import { jwtDecode } from 'jwt-decode';
 
 const UsersManagement = () => {
     const [users, setUsers] = useState([]);
@@ -14,6 +15,19 @@ const UsersManagement = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [editingKey, setEditingKey] = useState(null);
     const [formData, setFormData] = useState({ username: '', password: '', role: 'User', isLocked: false });
+
+    const getMyUsername = () => {
+        const token = localStorage.getItem('token');
+        if (!token) return '';
+        try {
+            const decoded = jwtDecode(token);
+            // Lấy đúng cái claim Name mà C# đã nặn ra
+            return decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] || decoded.unique_name || decoded.name || '';
+        } catch (e) {
+            return '';
+        }
+    };
+    const myUsername = getMyUsername();
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -124,12 +138,6 @@ const UsersManagement = () => {
                             value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}
                             style={{ flex: 1, padding: '10px', borderRadius: '6px', backgroundColor: '#0f172a', color: '#fff', border: '1px solid #475569' }} 
                         />
-                        <select 
-                            value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}
-                            style={{ padding: '10px', borderRadius: '6px', backgroundColor: '#0f172a', color: '#fff', border: '1px solid #475569' }}>
-                            <option value="User">User</option>
-                            <option value="Admin">Admin</option>
-                        </select>
                         
                         {/* Nút khóa tài khoản (chỉ hiện khi đang sửa) */}
                         {isEditing && (
@@ -174,8 +182,16 @@ const UsersManagement = () => {
                                     <td><span style={{ backgroundColor: roleStyle.bg, color: roleStyle.text, padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>{role}</span></td>
                                     <td>{isLocked ? '🔴 Bị khóa' : '🟢 Hoạt động'}</td>
                                     <td>
-                                        <button onClick={() => handleEditClick(u)} style={{ color: '#eab308', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', marginRight: '15px' }}>Sửa</button>
-                                        <button onClick={() => handleDelete(userKey)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>Xóa</button>
+                                        <button onClick={() => handleEditClick(u)} style={{ color: '#eab308', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', marginRight: '15px' }}>
+                                            Sửa
+                                        </button>
+                                        {username !== myUsername ? (
+                                            <button onClick={() => handleDelete(userKey)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
+                                                Xóa
+                                            </button>
+                                        ) : (
+                                            <span style={{ color: '#64748b', fontSize: '0.8rem', fontStyle: 'italic' }}>(Tài khoản của bạn)</span>
+                                        )}
                                     </td>
                                 </tr>
                             );
