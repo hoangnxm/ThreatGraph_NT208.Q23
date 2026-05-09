@@ -35,7 +35,7 @@ function App() {
   const role = getRoleFromToken();
 
   return (
-    <HashRouter>
+    <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
         
@@ -61,8 +61,10 @@ function App() {
             element={role === 'Admin' ? <DataFeeds /> : <Navigate to='/'/>} 
           />
         </Route>
+        {/* THÊM ĐÚNG DÒNG NÀY VÀO ĐỂ BẮT HẾT LỖI 404 */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </HashRouter>
+    </BrowserRouter>
   );
 }
 export default App;
