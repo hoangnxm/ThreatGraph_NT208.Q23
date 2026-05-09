@@ -7,7 +7,7 @@ namespace NT208_Project.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public class DashboardController : ControllerBase
     {
         private readonly IArangoDBClient _db;
