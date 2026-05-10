@@ -112,7 +112,7 @@ const handleDelete = async (id) => {
             
             // Thành công thì đóng form và reset dữ liệu
             setShowForm(false);
-            setFormData({ type: 'IP', value: '', riskScore: 0, country: '', tags: [] });
+            setFormData({ type: 'IP', value: '', riskScore: 0, country: '', originRef: 'Manual Entry', tags: [] });
             fetchIocs();
             
         } catch (err) { 
@@ -218,7 +218,7 @@ const handleDelete = async (id) => {
                                 setShowForm(false);
                                 setIsEditing(false);
                                 setEditingId(null);
-                                setFormData({ type: 'IP', value: '', riskScore: 0, country: '', tags: [] });
+                                setFormData({ type: 'IP', value: '', riskScore: 0, country: '', originRef: 'Manual Entry', tags: [] });
                             }} 
                             style={{ backgroundColor: '#64748b', color: '#fff', padding: '10px 25px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
                             Hủy
