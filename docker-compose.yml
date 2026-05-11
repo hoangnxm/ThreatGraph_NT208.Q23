@@ -27,8 +27,11 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_URL=http://20.196.128.188:7193/api
+        - VITE_API_URL=https://threatgraph.me/api/
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - backend
