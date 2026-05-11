@@ -1,4 +1,4 @@
-﻿using ArangoDBNetStandard;
+using ArangoDBNetStandard;
 using ArangoDBNetStandard.CursorApi.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
@@ -33,6 +33,7 @@ namespace NT208_Project.Controllers
                     
                     LET paths = (
                         FOR v, e, p IN 1..1 ANY startNodeId IocRelationships 
+                        SORT v._id ASC // ĐÃ THÊM: Sắp xếp để không bị lộn xộn
                         LIMIT 50 // Giới hạn 50 node để tránh nổ UI ngay từ đầu
                         RETURN { vertex: v, edge: e }
                     )
@@ -112,7 +113,8 @@ namespace NT208_Project.Controllers
                     
                     LET paths = (
                         FOR v, e, p IN 1..1 ANY startNodeId IocRelationships 
-                        LIMIT @skip, 30 // Bỏ qua 'skip' node, lấy 30 node tiếp theo
+                        SORT v._id ASC // ĐÃ THÊM: Sắp xếp để phân trang chính xác
+                        LIMIT @skip, 20 // ĐÃ ĐỔI: Lấy 20 node mỗi lần click
                         RETURN { vertex: v, edge: e }
                     )
                     
