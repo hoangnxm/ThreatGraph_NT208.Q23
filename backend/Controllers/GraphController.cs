@@ -37,14 +37,20 @@ namespace NT208_Project.Controllers
                         RETURN { vertex: v, edge: e }
                     )
                     
+                    // XỬ LÝ CÁC NODE LIÊN QUAN (Kèm thuật toán giảm điểm theo thời gian)
                     LET nodes = (
                         FOR p IN paths 
+                        LET daysOld = HAS(p.vertex, 'CreatedAt') ? DATE_DIFF(p.vertex.CreatedAt, DATE_NOW(), 'day') : 0
+                        LET decayAmount = FLOOR(daysOld / 7) * 5
+                        LET dynamicScore = MAX([0, p.vertex.RiskScore - decayAmount])
+                        
                         RETURN DISTINCT {
                             id: p.vertex._id,
                             name: p.vertex.Value,
                             type: p.vertex.Type,
-                            val: (p.vertex.RiskScore / 10) + 1, 
-                            color: p.vertex.RiskScore >= 80 ? '#ff7b72' : (p.vertex.RiskScore >= 50 ? '#d29922' : '#238636')
+                            val: (dynamicScore / 10) + 1, 
+                            color: dynamicScore >= 80 ? '#ff7b72' : (dynamicScore >= 50 ? '#d29922' : '#238636'),
+                            actualRiskScore: dynamicScore
                         }
                     )
                     
@@ -58,13 +64,19 @@ namespace NT208_Project.Controllers
                         }
                     )
                     
+                    // XỬ LÝ NODE GỐC (Tâm điểm tra cứu)
                     LET rootNode = DOCUMENT(startNodeId)
+                    LET rootDaysOld = HAS(rootNode, 'CreatedAt') ? DATE_DIFF(rootNode.CreatedAt, DATE_NOW(), 'day') : 0
+                    LET rootDecay = FLOOR(rootDaysOld / 7) * 5
+                    LET rootScore = MAX([0, rootNode.RiskScore - rootDecay])
+                    
                     LET rootNodeFormatted = { 
                         id: rootNode._id, 
                         name: rootNode.Value, 
                         type: rootNode.Type, 
-                        val: (rootNode.RiskScore / 10) + 3, 
-                        color: '#a371f7'
+                        val: (rootScore / 10) + 3, // Node gốc to hơn xíu
+                        color: '#a371f7',
+                        actualRiskScore: rootScore
                     }
                     
                     RETURN { 
@@ -104,19 +116,12 @@ namespace NT208_Project.Controllers
                         RETURN { vertex: v, edge: e }
                     )
                     
+                    // ĐÃ FIX LỖI SYNTAX Ở ĐÂY & ÁP DỤNG THUẬT TOÁN DECAY
                     LET nodes = (
-                        FOR p IN paths 
-                        RETURN DISTINCT {
-                            id: p.vertex._id,
-                            name: p.vertex.Value,
-                            type: p.vertex.Type,
-                            val: (p.vertex.RiskScore / 10) + 1, 
-                            color: p.vertex.RiskScore >= 80 ? '#ff7b72' : (p.vertex.RiskScore >= 50 ? '#d29922' : '#238636')
-                       LET nodes = (
                         FOR p IN paths 
                         
                         // 1. Tính toán tuổi của Node (Số ngày từ lúc tạo đến hiện tại)
-                        LET daysOld = DATE_DIFF(p.vertex.CreatedAt, DATE_NOW(), 'day')
+                        LET daysOld = HAS(p.vertex, 'CreatedAt') ? DATE_DIFF(p.vertex.CreatedAt, DATE_NOW(), 'day') : 0
                         
                         // 2. Thuật toán Decay: Cứ 7 ngày trừ 5 điểm
                         LET decayAmount = FLOOR(daysOld / 7) * 5
@@ -129,14 +134,13 @@ namespace NT208_Project.Controllers
                             name: p.vertex.Value,
                             type: p.vertex.Type,
                             
-                            // Sử dụng dynamicScore để quyết định kích thước và màu sắc
+                            // Sử dụng dynamicScore để quyết định kích thước (val) và màu sắc
                             val: (dynamicScore / 10) + 1, 
                             color: dynamicScore >= 80 ? '#ff7b72' : (dynamicScore >= 50 ? '#d29922' : '#238636'),
                             
-                            // Trả về thêm điểm thực tế để nếu cần hiển thị lên UI thì dùng
+                            // Trả về thêm điểm thực tế
                             actualRiskScore: dynamicScore 
                         }
-                    ) }
                     )
                     
                     LET links = (
@@ -176,7 +180,7 @@ namespace NT208_Project.Controllers
         }
     }
 
-    // Model cho response (Giữ nguyên)
+    // Model cho response
     public class GraphDataResponse
     {
         public List<GraphNode> nodes { get; set; } = new List<GraphNode>();
@@ -190,6 +194,7 @@ namespace NT208_Project.Controllers
         public string type { get; set; } = string.Empty;
         public double val { get; set; }
         public string color { get; set; } = string.Empty;
+        public double? actualRiskScore { get; set; } // Bổ sung trường này cho Model C# đỡ báo lỗi
     }
 
     public class GraphLink
