@@ -26,11 +26,10 @@ function SearchPage(){
   // Động cơ vật lý: Tự động chạy lại mỗi khi graphData thay đổi (kéo thêm node)
   useEffect(() => {
     if (fgRef.current) {
-      // Đẩy tụi nó văng xa ra nhau
-      fgRef.current.d3Force('charge').strength(-400);
-      // Nới lỏng dây thừng
-      fgRef.current.d3Force('link').distance(120);
-      // Khởi động lại engine
+      // Tăng lực đẩy từ -400 lên -800 hoặc -1000 để tụi nó né nhau ra
+      fgRef.current.d3Force('charge').strength(-800);
+      // Nới khoảng cách dây nối ra một chút
+      fgRef.current.d3Force('link').distance(150);
       fgRef.current.d3ReheatSimulation();
     }
   }, [graphData]);
@@ -142,8 +141,9 @@ function SearchPage(){
               name: n.name || "Unknown",
               val: Number(n.val) || 5,
               color: color,
-              x: node.x, 
-              y: node.y 
+              // Sinh ra xung quanh node cha với độ lệch ngẫu nhiên nhỏ
+              x: node.x + (Math.random() - 0.5) * 20, 
+              y: node.y + (Math.random() - 0.5) * 20
             };
           });
 
