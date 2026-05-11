@@ -74,7 +74,7 @@ namespace IocNodes.Services
 
                     // --- BƯỚC 2: QUÉT TRỰC TIẾP INDICATORS TỪ PULSE ---
                     // (Không cần phải gọi API móc ruột nữa vì nó có sẵn rồi)
-                    foreach (var ind in pulse.Indicators)
+                    foreach (var ind in pulse.Indicators.Take(100))
                     {
                         var mappedType = MapOtxTypeToSystemType(ind.Type);
                         if (mappedType == null) continue;
