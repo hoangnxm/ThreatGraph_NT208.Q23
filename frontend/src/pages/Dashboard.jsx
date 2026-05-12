@@ -64,20 +64,12 @@ const Dashboard = () => {
     return (
         <div style={{ color: '#fff', padding: '20px' }}>
             <h2>HỆ THỐNG GIÁM SÁT IOC</h2>
-            // Chỉ Admin mới thấy 2 chỉ số này
            {userRole === 'Admin' && (
                 <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
                     <div style={adminCardStyle}>Users: {stats.totalUsers}</div>
                     <div style={adminCardStyle}>Logs: {stats.totalLogs}</div>
                 </div>
             )}
-            // Dù là User hay Admin cũng đều thấy 3 chỉ số này
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
-                <div style={userCardStyle}>Tổng IOC: {stats.totalIocs}</div>
-                <div style={userCardStyle}>Thêm hôm nay: {stats.iocsToday}</div>
-                <div style={userCardStyle}>Edges: {stats.totalEdges}</div>
-            </div>
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
                 <div style={userCardStyle}>Tổng IOC: {stats.totalIocs}</div>
                 <div style={userCardStyle}>Thêm hôm nay: {stats.iocsToday}</div>
