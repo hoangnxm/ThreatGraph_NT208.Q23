@@ -28,6 +28,60 @@ namespace IocNodes.Services
             _iocRepo = iocRepo;
             _logger = logger;
         }
+        private int CalculateDynamicRiskScore(OtxPulse pulse, OtxIndicator indicator)
+        {
+            int score = 0;
+
+            // 1. Trạng thái hoạt động
+            if (indicator.IsActive == 1) score += 20;
+            else score += 5;
+
+            // Trừ điểm nếu đã quá hạn
+            if (indicator.Expiration.HasValue && indicator.Expiration.Value < DateTime.UtcNow)
+            {
+                score -= 15;
+            }
+
+            // 2. Độ phổ biến (Observations)
+            if (indicator.Observations > 100) score += 15;
+            else if (indicator.Observations > 10) score += 10;
+            else if (indicator.Observations > 0) score += 5;
+
+            // 3. Vai trò (Role) & Phân loại (Type)
+            string roleStr = (indicator.Role ?? "").ToLower();
+            if (roleStr.Contains("c2") || roleStr.Contains("malware") || roleStr.Contains("phishing") || roleStr.Contains("exploit"))
+                score += 10;
+
+            // Type cũ của ông viết hoa hay thường thì cứ dùng thuộc tính của ông nhé
+            string typeStr = (indicator.Type ?? "").ToLower();
+            if (typeStr.Contains("hash") || typeStr.Contains("md5") || typeStr.Contains("sha")) score += 10;
+            else if (typeStr.Contains("domain") || typeStr.Contains("hostname")) score += 7;
+            else if (typeStr.Contains("ipv4") || typeStr.Contains("ipv6")) score += 5;
+
+            // 4. Mức độ nhạy cảm (TLP)
+            string tlp = (pulse.TLP ?? "").ToLower();
+            if (tlp == "red") score += 20;
+            else if (tlp == "amber") score += 15;
+            else if (tlp == "green") score += 10;
+            else if (tlp == "white") score += 5;
+
+            // 5. Mức độ tinh vi (Adversary - Nhóm APT)
+            if (!string.IsNullOrWhiteSpace(pulse.Adversary)) score += 15;
+
+            // 6. Nhắm mục tiêu cụ thể
+            if (pulse.TargetedCountries != null && pulse.TargetedCountries.Count > 0) score += 5;
+            if (pulse.Industries != null && pulse.Industries.Count > 0) score += 5;
+            // 7. Độ uy tín và Cập nhật
+            if (pulse.References != null)
+            {
+                if (pulse.References.Count > 2) score += 10;
+                else if (pulse.References.Count > 0) score += 5;
+            }
+            if (pulse.Revision > 5) score += 5;
+
+            // Cân bằng điểm
+            return Math.Max(1, Math.Min(100, score));
+        }
 
         public async Task<int> SyncAlienVaultDataAsync()
         {
@@ -79,17 +133,25 @@ namespace IocNodes.Services
 
                     foreach (var ind in pulse.Indicators.Take(100))
                     {
+                        // Gọi hàm map của ông (Lưu ý: tùy cách ông viết DTO, Type có thể là Type hoặc type)
                         var mappedType = MapOtxTypeToSystemType(ind.Type);
                         if (mappedType == null) continue;
 
                         string cleanValue = ind.Indicator.Trim();
                         string iocKey = string.Empty;
 
+                        // ==========================================
+                        // GỌI HÀM TÍNH ĐIỂM Ở NGAY ĐÂY
+                        // ==========================================
+                        int dynamicScore = CalculateDynamicRiskScore(pulse, ind);
+
                         var existingIoc = await _iocRepo.GetByValueAsync(cleanValue);
 
                         if (existingIoc != null && !string.IsNullOrEmpty(existingIoc.Key))
                         {
                             iocKey = existingIoc.Key;
+                            // (Lưu ý: Nếu node đã tồn tại, code hiện tại của ông chỉ lấy Key chứ chưa update điểm mới. 
+                            // Tạm thời cứ giữ nguyên thế này để an toàn, không phá luồng cũ).
                         }
                         else
                         {
@@ -97,7 +159,8 @@ namespace IocNodes.Services
                             {
                                 Type = mappedType,
                                 Value = cleanValue,
-                                RiskScore = 70,
+                                // THAY VÌ 70, GÁN BIẾN ĐÃ TÍNH VÀO ĐÂY
+                                RiskScore = dynamicScore,
                                 OriginRef = "AlienVault OTX",
                                 Tags = new List<string> { "OTX", "AutoSync" }
                             };
