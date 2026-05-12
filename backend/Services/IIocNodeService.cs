@@ -14,6 +14,7 @@ namespace IocNodes.Services
         Task<PagedResult<IocNodeResponse>> GetAllPagedAsync(int offset, int limit, string? type = null, string? keyword = null);
         Task<bool> DeleteAsync(string id);
 
+        Task<bool> DeleteAllAsync();
         Task<IocNodeResponse?> GetByValueAsync(string value);
 
         // Khai báo hàm tạo liên kết giữa 2 node

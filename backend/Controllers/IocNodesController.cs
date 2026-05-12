@@ -164,7 +164,23 @@ namespace IocNodes.Controllers
             }
         }
 
-        
+        // Thêm vào IocNodesController.cs
+        [HttpDelete("all")]
+        [Authorize(Roles = "Admin")] // Chỉ Admin mới được phép gọi API này
+        public async Task<IActionResult> DeleteAll()
+        {
+            try
+            {
+                // Giả sử ông đã thêm phương thức vào Service tương ứng
+                await _iocService.DeleteAllAsync();
+                return Ok(new { message = "Đã xóa sạch toàn bộ dữ liệu IOC và các mối quan hệ!" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
         // GET: api/iocnodes/paged?offset=0&limit=50&type=IP&keyword=103
         [HttpGet("paged")]
         [Authorize]

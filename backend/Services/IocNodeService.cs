@@ -104,6 +104,19 @@ namespace IocNodes.Services
             return await _repository.DeleteAsync(id);
         }
 
+        public async Task<bool> DeleteAllAsync()
+        {
+            try
+            {
+                return await _repository.DeleteAllIocsAsync();
+            }
+            catch (Exception ex)
+            {
+                // Có thể thêm log lỗi ở đây nếu cần
+                throw new Exception($"Lỗi ở tầng Service khi xóa toàn bộ IOC: {ex.Message}");
+            }
+        }
+
 
 
         private IocNodeResponse MapToResponse(IocNode node)
