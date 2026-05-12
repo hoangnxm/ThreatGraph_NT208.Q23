@@ -137,6 +137,7 @@ namespace NT208_Project.Controllers
 
         // GET: api/Graph/expand/{nodeKey}
         // Gọi khi user Click CHUỘT PHẢI vào 1 node bất kỳ trên màn hình
+      // GET: api/Graph/expand/{nodeKey}
         [HttpGet("expand/{nodeKey}")]
         public async Task<IActionResult> ExpandGraph(string nodeKey, [FromQuery] int skip = 0)
         {
@@ -145,58 +146,84 @@ namespace NT208_Project.Controllers
                 string query = @"
                     LET startNodeId = CONCAT('IocNodes/', @nodeKey)
                     
-                    LET paths = (
-                        FOR v, e, p IN 1..1 ANY startNodeId IocRelationships 
-                        FILTER v.Type != 'Campaign'
-                        SORT v._id ASC // ĐÃ THÊM: Sắp xếp để phân trang chính xác
-                        LIMIT @skip, 20 // ĐÃ ĐỔI: Lấy 20 node mỗi lần click
-                        RETURN { vertex: v, edge: e }
+                    // 1. TÌM CHIẾN DỊCH: Lấy tất cả Campaign của node được click
+                    LET campaigns = (
+                        FOR v IN 1..1 ANY startNodeId IocRelationships
+                        FILTER v.Type == 'Campaign'
+                        RETURN v._id
                     )
                     
-                    // ĐÃ FIX LỖI SYNTAX Ở ĐÂY & ÁP DỤNG THUẬT TOÁN DECAY
+                    // 2. TÌM ANH EM & HÀNG XÓM (Chưa phân trang)
+                    LET siblings = (
+                        FOR campId IN campaigns
+                            FOR v IN 1..1 ANY campId IocRelationships
+                            FILTER v.Type != 'Campaign' AND v._id != startNodeId
+                            RETURN v
+                    )
+                    
+                    LET directNeighbors = (
+                        FOR v IN 1..1 ANY startNodeId IocRelationships
+                        FILTER v.Type != 'Campaign'
+                        RETURN v
+                    )
+                    
+                    // 3. GỘP LẠI & PHÂN TRANG (Chỉ lấy đúng 20 node mỗi lần click)
+                    LET combined = UNIQUE(APPEND(siblings, directNeighbors))
+                    LET allNodes = (
+                        FOR v IN combined
+                        SORT v._id ASC
+                        LIMIT @skip, 20
+                        RETURN v
+                    )
+                    
+                    // 4. LÃO HÓA (Thuật toán Decay)
                     LET nodes = (
-                        FOR p IN paths 
-                        
-                        // 1. Tính toán tuổi của Node (Số ngày từ lúc tạo đến hiện tại)
-                        LET daysOld = HAS(p.vertex, 'CreatedAt') ? DATE_DIFF(p.vertex.CreatedAt, DATE_NOW(), 'day') : 0
-                        
-                        // 2. Thuật toán Decay: Cứ 7 ngày trừ 5 điểm
+                        FOR v IN allNodes 
+                        LET daysOld = HAS(v, 'CreatedAt') ? DATE_DIFF(v.CreatedAt, DATE_NOW(), 'day') : 0
                         LET decayAmount = FLOOR(daysOld / 7) * 5
-                        
-                        // 3. Tính điểm thực tế (Dynamic Score)
-                        LET dynamicScore = MAX([0, p.vertex.RiskScore - decayAmount])
+                        LET dynamicScore = MAX([0, v.RiskScore - decayAmount])
                         
                         RETURN DISTINCT {
-                            id: p.vertex._id,
-                            name: p.vertex.Value,
-                            type: p.vertex.Type,
-                            
-                            // Sử dụng dynamicScore để quyết định kích thước (val) và màu sắc
+                            id: v._id,
+                            name: v.Value,
+                            type: v.Type,
                             val: (dynamicScore / 10) + 1, 
                             color: dynamicScore >= 80 ? '#ff7b72' : (dynamicScore >= 50 ? '#d29922' : '#238636'),
-                            
-                            // Trả về thêm điểm thực tế
-                            actualRiskScore: dynamicScore 
+                            actualRiskScore: dynamicScore
                         }
                     )
                     
-                    LET allVisibleIds = APPEND(paths[*]._id, [startNodeId])
-                    LET links = (
-                        FOR p IN paths 
-                        FILTER p.edge != null 
+                    LET allVisibleIds = APPEND(allNodes[*]._id, [startNodeId])
+                    
+                    // 5. TƠ NGANG (Lấy các liên kết chéo vòng tròn giữa các node mới)
+                    LET realLinks = (
+                        FOR e IN IocRelationships
+                        FILTER e._from IN allVisibleIds AND e._to IN allVisibleIds AND e.RelationType != 'belongs_to'
                         RETURN DISTINCT {
-                            source: p.edge._from,
-                            target: p.edge._to,
-                            name: p.edge.RelationType
+                            source: e._from,
+                            target: e._to,
+                            name: e.RelationType
                         }
                     )
                     
+                    // 6. TƠ DỌC (Tạo liên kết ảo từ node được click ra các node anh em mới nở)
+                    LET virtualLinks = (
+                        FOR n IN allNodes
+                        RETURN {
+                            source: startNodeId,
+                            target: n._id,
+                            name: 'shared_campaign'
+                        }
+                    )
+                    
+                    LET links = UNIQUE(APPEND(realLinks, virtualLinks))
+                    
+                    // KHÔNG cần trả về Root Node ở đây vì UI đã có sẵn Node đó rồi
                     RETURN { 
                         nodes: nodes, 
                         links: links 
                     }";
 
-                // Truyền tham số skip vào AQL
                 var bindVars = new Dictionary<string, object> {
                     { "nodeKey", nodeKey },
                     { "skip", skip }
