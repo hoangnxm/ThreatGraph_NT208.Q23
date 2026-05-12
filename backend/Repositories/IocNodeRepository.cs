@@ -130,18 +130,19 @@ namespace backend.Repositories
         // Thêm vào IocNodeRepository.cs
         public async Task<bool> DeleteAllIocsAsync()
         {
-            // Query xóa sạch node và quan hệ
-            var query = @"
-        FOR i IN IocNodes REMOVE i IN IocNodes
-        LET relations = (FOR r IN IocRelationships REMOVE r IN IocRelationships)
-        RETURN true";
-
-            try
+            try 
             {
-                await _dbClient.Cursor.PostCursorAsync<dynamic>(new PostCursorBody { Query = query });
+                // Bước 1: Quét sạch bảng quan hệ (Edge) trước để gỡ hết các "sợi tơ"
+                string queryEdges = "FOR r IN IocRelationships REMOVE r IN IocRelationships";
+                await _dbClient.Cursor.PostCursorAsync<dynamic>(new PostCursorBody { Query = queryEdges });
+
+                // Bước 2: Quét sạch bảng Node (Đỉnh)
+                string queryNodes = "FOR i IN IocNodes REMOVE i IN IocNodes";
+                await _dbClient.Cursor.PostCursorAsync<dynamic>(new PostCursorBody { Query = queryNodes });
+
                 return true;
-            }
-            catch (Exception ex)
+            } 
+            catch (Exception ex) 
             {
                 throw new Exception($"Lỗi khi dọn dẹp Database: {ex.Message}");
             }
