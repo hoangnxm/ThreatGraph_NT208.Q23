@@ -64,7 +64,7 @@ namespace IocNodes.DTOs
     /// <summary>Outbound representation of an IocNode.</summary>
     public class IocNodeResponse
     {
-        public string Id { get; set; } = string.Empty;   // _key
+        public string Id { get; set; } = string.Empty; 
         public string Type { get; set; } = string.Empty;
         public string Value { get; set; } = string.Empty;
         public int RiskScore { get; set; }
@@ -72,7 +72,6 @@ namespace IocNodes.DTOs
         public List<string> Tags { get; set; } = new();
         public string OriginRef { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
-
         public DateTime? UpdatedAt { get; set; }
     }
 

@@ -8,7 +8,7 @@ using System.Security.Claims;
 namespace IocNodes.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")] // Route sẽ tự map thành: api/iocnodes
+    [Route("api/[controller]")]
     public class IocNodesController : ControllerBase
     {
         private readonly IIocNodeService _service;
@@ -45,7 +45,6 @@ namespace IocNodes.Controllers
 
             try
             {
-                // 1. KIỂM TRA TRÙNG LẶP TRƯỚC KHI TẠO
                 // Gọi xuống Service để tìm xem Value này đã có trong Database chưa
                 var existingNode = await _service.GetByValueAsync(request.Value);
 
@@ -56,14 +55,13 @@ namespace IocNodes.Controllers
                     {
                         message = $"Node '{request.Value}' đã tồn tại trong hệ thống!",
                         source = existingNode.OriginRef,
-                        existingKey = existingNode.Id // Hoặc existingNode.Key tùy thuộc vào model trả về của bạn
+                        existingKey = existingNode.Id
                     });
                 }
 
                 var currentUser = User.Identity?.Name ?? "Unknown";
                 request.OriginRef = currentUser;
 
-                // 2. NẾU CHƯA CÓ THÌ TIẾN HÀNH TẠO MỚI
                 var result = await _service.CreateAsync(request);
 
                 // Trả về HTTP 201 Created kèm header Location trỏ tới URL của resource vừa tạo
@@ -96,7 +94,6 @@ namespace IocNodes.Controllers
             }
             catch (System.Exception ex)
             {
-                // Nếu ArangoDB báo lỗi (ví dụ: Key không tồn tại trong DB), sẽ bắt ở đây
                 return StatusCode(500, new { message = $"Lỗi hệ thống: {ex.Message}" });
             }
         }

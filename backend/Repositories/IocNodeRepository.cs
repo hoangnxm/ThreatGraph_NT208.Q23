@@ -85,9 +85,6 @@ namespace backend.Repositories
             } catch (ApiErrorException ex) when (ex.ApiError.ErrorNum == 1202) { return false; }
         }
 
-        // ==========================================
-        // 2 HÀM XỬ LÝ ĐỒ THỊ
-        // ==========================================
         public async Task<IocNode?> GetByValueAsync(string value)
         {
             var query = "FOR i IN @@collection FILTER i.Value == @value RETURN i";
@@ -117,7 +114,6 @@ namespace backend.Repositories
                 await _dbClient.Cursor.PostCursorAsync<dynamic>(new PostCursorBody { Query = query, BindVars = bindVars });
                 return true;
             } catch (System.Exception ex) {
-                // Quăng thẳng lỗi để bắt bệnh nếu ArangoDB từ chối
                 throw new System.Exception($"Lỗi Database khi tạo Edge: {ex.Message}");
             }
         }

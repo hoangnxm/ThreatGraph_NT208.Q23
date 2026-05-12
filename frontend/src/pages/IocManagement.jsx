@@ -4,69 +4,117 @@ import { useOutletContext } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 
 const IocManagement = () => {
-    const [iocs, setIocs] = useState([]);
-    const [loading, setLoading] = useState(true);
+    // Khởi tạo mảng chứa danh sách các IOC sẽ hiển thị lên bảng dữ liệu
+    const [iocs, setIocs] = useState([]); 
+    
+    // Trạng thái dùng để hiển thị biểu tượng "Đang tải" khi chờ API phản hồi
+    const [loading, setLoading] = useState(true); 
+    
+    // Biến lưu trữ nội dung thông báo lỗi nếu việc gọi API thất bại
     const [error, setError] = useState('');
     
-    // Lấy searchText từ thanh Search chung của hệ thống
+    // Lấy dữ liệu chia sẻ từ Layout chung
     const context = useOutletContext();
+    
+    // Trích xuất từ khóa tìm kiếm từ context, nếu không có thì để rỗng
     const searchText = context ? context[0] : '';
 
-    // Phân trang & Lọc
-    const [page, setPage] = useState(1);
+    // Lưu trữ số trang hiện tại mà người dùng đang xem
+    const [page, setPage] = useState(1); 
+    
+    // Quy định số lượng bản ghi tối đa hiển thị trên mỗi trang 
     const [limit, setLimit] = useState(10);
-    const [totalCount, setTotalCount] = useState(0);
-    const [typeFilter, setTypeFilter] = useState(''); // State mới cho Dropdown lọc Type
+    
+    // Lưu tổng số lượng IOC hiện có trong Database để tính toán phân trang
+    const [totalCount, setTotalCount] = useState(0); 
+    
+    // Lưu trữ tiêu chí lọc IP, Domain hoặc Hash từ người dùng
+    const [typeFilter, setTypeFilter] = useState(''); 
 
-    // --- Quản lý ô nhập số trang ---
+    // Quản lý giá trị số trang trong ô nhập liệu thủ công của người dùng
     const [inputPage, setInputPage] = useState(1);
+    
+    // Tự động tính toán tổng số trang dựa trên tổng bản ghi chia cho giới hạn mỗi trang
     const totalPages = Math.ceil(totalCount / limit) || 1;
 
-    // Đồng bộ ô input khi trang thay đổi (do bấm Next/Prev hoặc search)
+    // Hiển thị số trang thực tế khi trang thay đổi
     useEffect(() => {
         setInputPage(page);
     }, [page]);
 
+    // 
     const handleInputPageChange = (e) => {
-        // Chỉ cho phép nhập số nguyên (Regex loại bỏ mọi dấu -, ., e, chữ cái)
+        // Chỉ cho phép nhập số nguyên
         const val = e.target.value.replace(/[^0-9]/g, '');
         setInputPage(val);
     };
 
     const handleInputPageSubmit = (e) => {
-        // Chỉ chạy khi bấm Enter hoặc click chuột ra ngoài (blur)
+        // Chỉ chạy khi bấm Enter hoặc click chuột ra ngoài
         if (e.key === 'Enter' || e.type === 'blur') {
             let value = parseInt(inputPage, 10);
 
             if (isNaN(value) || value < 1) {
-                value = 1; // Nhập tào lao thì về trang 1
+                value = 1; 
             } else if (value > totalPages) {
-                value = totalPages; // Nhập lố thì về trang cuối
+                value = totalPages; 
             }
-
             setPage(value);
             setInputPage(value);
         }
     };
     
-    // State quản lý Form
+    // Điều khiển việc Ẩn hoặc Hiện cái bảng nhập liệu thêm/sửa IOC
     const [showForm, setShowForm] = useState(false);
-    const [isEditing, setIsEditing] = useState(false);
-    const [editingId, setEditingId] = useState(null);
-    const [formData, setFormData] = useState({ type: 'IP', value: '', riskScore: 0, country: '', originRef: 'Manual Entry', tags: [] });
-    const [showRelForm, setShowRelForm] = useState(false);
-    const [relFormData, setRelFormData] = useState({ fromValue: '', toValue: '', relationType: 'related_to' });
 
-   const fetchIocs = useCallback(async () => {
+    // Dùng để thay đổi tiêu đề cái bảng và đổi nút "Lưu" thành "Cập nhật"
+    const [isEditing, setIsEditing] = useState(false);
+
+    // Lưu lại cái ID của IOC đang chọn để sửa
+    const [editingId, setEditingId] = useState(null);
+
+    // Thùng chứa dữ liệu thực tế của form IOC (Loại, Giá trị, Điểm rủi ro...)
+    const [formData, setFormData] = useState({ 
+        type: 'IP', 
+        value: '', 
+        riskScore: 0, 
+        country: '', 
+        originRef: 'Manual Entry', 
+        tags: [] 
+    });
+
+    // Điều khiển việc Ẩn hoặc Hiện cái bảng tạo Liên kết giữa 2 IOC
+    const [showRelForm, setShowRelForm] = useState(false);
+
+    // Thùng chứa dữ liệu để tạo liên kết: "Nguồn" nối với "Đích" bằng "Quan hệ" gì
+    const [relFormData, setRelFormData] = useState({ 
+        fromValue: '', 
+        toValue: '', 
+        relationType: 'related_to' 
+    });
+
+    // useCallback để lưu hàm vào bộ nhớ tránh khởi tạo hàm vô ích
+    const fetchIocs = useCallback(async () => {
+        // Bật trạng thái đang chạy
         setLoading(true);
         try {
+            // Tính vị trí dòng đầu tiên của các trang
             const offset = (page - 1) * limit;
+            
+            // Tạo URL với tham số offset và limit
             let url = `/iocnodes/paged?offset=${offset}&limit=${limit}`;
+            
+            // Nếu lọc nối thêm vào URL
             if (typeFilter) url += `&type=${typeFilter}`;
+
+            // Nếu tìm kiếm nối thêm vào URL
             if (searchText) url += `&keyword=${searchText}`;
 
+            // Gọi API
             const res = await axiosClient.get(url);
+            // Cập nhật dữ liệu IOC
             setIocs(res.data.items || []);
+            // Cập nhật tổng IOC
             setTotalCount(res.data.totalCount || 0);
         } catch (err) {
             setError(err.response?.data?.message || err.message || "Lỗi tải dữ liệu.");
@@ -80,28 +128,53 @@ const IocManagement = () => {
         setPage(1);
     }, [searchText, typeFilter]);
 
+    // Gọi API
     useEffect(() => { 
         fetchIocs(); 
     }, [fetchIocs]);
 
-    // XÓA IOC
+    // Xóa IOC
     const handleDelete = async (id) => {
+        // Hiển thị bảng thông báo xác nhận của trình duyệt để tránh bấm nhầm
         if (!window.confirm("Bạn có chắc chắn muốn xóa IOC này không?")) return;
-        try { await axiosClient.delete(`/iocnodes/${id}`); fetchIocs(); } 
-        catch (err) { alert("Lỗi khi xóa: " + (err.response?.data?.message || err.message)); }
+
+        try { 
+            // Gọi lệnh DELETE tới API Backend kèm theo ID của IOC cần xóa
+            await axiosClient.delete(`/iocnodes/${id}`); 
+            
+            // Xóa thành công thì gọi lại hàm fetchIocs để cập nhật lại cái bảng
+            fetchIocs(); 
+        } 
+        catch (err) { 
+            alert("Lỗi khi xóa: " + (err.response?.data?.message || err.message)); 
+        }
     };
 
     const handleEditClick = (ioc) => {
-        setIsEditing(true); setEditingId(ioc.id);
-        setFormData({ type: ioc.type, value: ioc.value, riskScore: ioc.riskScore, country: ioc.country || '', tags: ioc.tags || [] });
+        // Chuyển trạng thái cờ hiệu sang "Đang sửa" để đổi tiêu đề Form thành "Cập nhật IOC"
+        setIsEditing(true); 
+
+        // Ghi nhớ lại ID của cái IOC đang chọn để tí nữa bấm Lưu còn biết đường mà cập nhật đúng thằng đó
+        setEditingId(ioc.id);
+
+        // Đổ toàn bộ dữ liệu hiện có của hàng đó vào các ô nhập liệu (Form)
+        setFormData({ 
+            type: ioc.type, 
+            value: ioc.value, 
+            riskScore: ioc.riskScore, 
+            country: ioc.country || '', 
+            tags: ioc.tags || [] 
+        });
+
+        // Cuối cùng mới bật cái Popup (Modal) chứa Form lên cho người dùng thấy
         setShowForm(true);
     };
 
-    // HÀM MỚI: Validate dữ liệu trước khi gửi (Đã tối ưu cho cả Edit và Add)
+    // Validate dữ liệu trước khi gửi
     const validateFormData = () => {
         const { type, value, riskScore, country } = formData;
         
-        // 1. Chỉ validate Type và Value khi THÊM MỚI (vì Edit không cho sửa trường này)
+        // Chỉ validate Type và Value khi THÊM MỚI
         if (!isEditing) {
             if (type === 'IP') {
                 const ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
@@ -124,7 +197,7 @@ const IocManagement = () => {
             }
         }
 
-        // 2. Validate những trường dùng chung cho cả THÊM và SỬA
+        // Validate những trường dùng chung cho cả THÊM và SỬA
         
         // Kiểm tra Risk Score (0 - 100)
         const score = parseInt(riskScore, 10);
@@ -133,7 +206,7 @@ const IocManagement = () => {
             return false;
         }
 
-        // Kiểm tra Quốc gia (Country) - Tuỳ chọn: Phải là 2 chữ cái (VD: VN, US) nếu có nhập
+        // Kiểm tra Quốc gia (Country)
         if (country && !/^[a-zA-Z]{2}$/.test(country)) {
             alert("❌ Lỗi: Mã Quốc gia chỉ được chứa đúng 2 chữ cái (VD: VN, US)!");
             return false;
@@ -142,10 +215,10 @@ const IocManagement = () => {
         return true; // Dữ liệu hợp lệ
     };
 
+    // Lưu IOC
     const handleSaveIoc = async (e) => {
         e.preventDefault();
         
-        // DỪNG LẠI NẾU VALIDATE THẤT BẠI
         if (!validateFormData()) return;
 
         try {
@@ -168,7 +241,6 @@ const IocManagement = () => {
             fetchIocs();
             
         } catch (err) { 
-            // KIỂM TRA NẾU LỖI LÀ 409 CONFLICT (Trùng lặp Node)
             if (err.response && err.response.status === 409) {
                 const errData = err.response.data;
                 
@@ -180,12 +252,12 @@ const IocManagement = () => {
                 
                 alert(alertMsg);
             } else {
-                // Các lỗi khác (500, 400...)
                 alert("Lỗi khi lưu: " + (err.response?.data?.message || err.message)); 
             }
         }
     };
 
+    // Lưu mối liên kết
     const handleSaveRelationship = async (e) => {
         e.preventDefault();
         try {
@@ -210,8 +282,7 @@ const IocManagement = () => {
         <div style={{ backgroundColor: '#0f172a', padding: '25px', borderRadius: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'center' }}>
                 <h2 style={{ color: '#fff', margin: 0 }}>🛡️ QUẢN LÝ IOC</h2>
-                
-                {/* BỘ LỌC BỔ SUNG */}
+            
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <select 
                         value={typeFilter} 
@@ -238,7 +309,6 @@ const IocManagement = () => {
                 </div>
             </div>
 
-            {/* FORM NHẬP LIỆU */}
             {showForm && (
                 <form onSubmit={handleSaveIoc} style={{ backgroundColor: '#1e293b', padding: '20px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #334155' }}>
                     <h3 style={{ color: '#93c5fd', marginTop: 0 }}>{isEditing ? `✏️ Sửa IOC: ${formData.value}` : '✨ Thêm IOC Mới'}</h3>
@@ -275,7 +345,6 @@ const IocManagement = () => {
                 </form>
             )}
 
-            {/* FORM NHẬP LIỆU: TẠO LIÊN KẾT (RELATIONSHIP) */}
             {showRelForm && (
                 <form onSubmit={handleSaveRelationship} style={{ backgroundColor: '#1e293b', padding: '20px', borderRadius: '8px', marginBottom: '20px', border: '1px dashed #8b5cf6' }}>
                     <h3 style={{ color: '#c4b5fd', marginTop: 0 }}>🔗 Tạo Liên Kết Giữa 2 Node</h3>
@@ -315,7 +384,6 @@ const IocManagement = () => {
                 </form>
             )}
 
-            {/* BẢNG DỮ LIỆU */}
             <table style={{ width: '100%', color: '#e2e8f0', borderCollapse: 'collapse' }}>
                 <thead>
                     <tr style={{ borderBottom: '2px solid #334155', textAlign: 'left' }}>
@@ -344,7 +412,6 @@ const IocManagement = () => {
                 </tbody>
             </table>
 
-            {/* THANH ĐIỀU HƯỚNG PHÂN TRANG */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', color: '#94a3b8' }}>
                 <div>
                     Hiển thị {iocs.length} / Tổng số {totalCount} bản ghi
