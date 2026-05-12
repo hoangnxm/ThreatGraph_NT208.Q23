@@ -40,26 +40,41 @@ namespace NT208_Project.Controllers
                     return StatusCode(401, new { message = "Sai tài khoản hoặc mật khẩu!" });
                 }
 
-                // Check mật khẩu (Đồ án đang để thô chưa hash thì dùng ==)
-                // Nếu user null hoặc sai pass -> Đuổi!
-                // Lấy password từ DB ra
                 string dbPassword = (string)user.password ?? "";
-            // DÙNG BCRYPT ĐỂ GIẢI MÃ VÀ SO SÁNH
-            if (!BCrypt.Net.BCrypt.Verify(req.Password, dbPassword))
-            {
-                 return StatusCode(401, new { message = "Sai tài khoản hoặc mật khẩu!" });
-                 }
+
+                // DÙNG BCRYPT ĐỂ GIẢI MÃ VÀ SO SÁNH
+                if (!BCrypt.Net.BCrypt.Verify(req.Password, dbPassword))
+                {
+                    return StatusCode(401, new { message = "Sai tài khoản hoặc mật khẩu!" });
+                }
 
                 if (user.isLocked == true) return StatusCode(403, new { message = "Tài khoản đang bị khóa !" });
 
-                // Lấy Role từ DB (nếu không có thì mặc định cho làm Admin để test)
                 string role = user.role ?? "Admin";
+
+                string sessionToken = Guid.NewGuid().ToString();
+
+                string userKey = (string)user._key;
+                await _db.Cursor.PostCursorAsync<object>(new PostCursorBody
+                {
+                    Query = "UPDATE @key WITH { sessionToken: @sessionToken } IN Users",
+                    BindVars = new Dictionary<string, object>
+                    {
+                        { "key", userKey },
+                        { "sessionToken", sessionToken }
+                    }
+                });
 
                 // Nhả Token
                 var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JwtSettings:SecretKey"]!));
                 var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
                 var token = new JwtSecurityToken(
-                    claims: new[] { new Claim(ClaimTypes.Name, (string)user.username), new Claim(ClaimTypes.Role, role) },
+                    claims: new[] {
+                        new Claim(ClaimTypes.Name, (string)user.username),
+                        new Claim(ClaimTypes.Role, role),
+                        // 3. NHÉT CÁI MÃ PHIÊN NÀY VÀO TOKEN LÀM "VÉ GIỮ XE"
+                        new Claim("SessionToken", sessionToken)
+                    },
                     expires: DateTime.Now.AddHours(2),
                     signingCredentials: creds
                 );

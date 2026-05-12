@@ -97,7 +97,7 @@ const Dashboard = () => {
                     <table style={{ width: '100%', textAlign: 'left' }}>
                         <thead><tr><th>IP</th><th>Nguồn</th></tr></thead>
                         <tbody>
-                            {stats.topIps.map((ip, i) => (
+                            {stats.topIps.map((ip, i) => (                             
                                 <tr key={i} onClick={() => navigate(`/search?query=${ip.value || ip.Value}`)} style={{ cursor: 'pointer' }}>
                                     <td style={{ color: '#ef4444' }}>{ip.value || ip.Value}</td>
                                     <td>{ip.source || ip.Source}</td>

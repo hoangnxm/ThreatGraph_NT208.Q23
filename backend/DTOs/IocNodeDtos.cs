@@ -27,7 +27,6 @@ namespace IocNodes.DTOs
 
         public List<string>? Tags { get; set; }
 
-        [Required]
         public string? OriginRef { get; set; } = string.Empty;
     }
 

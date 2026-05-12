@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 
@@ -17,7 +18,7 @@ const IocManagement = () => {
     const [totalCount, setTotalCount] = useState(0);
     const [typeFilter, setTypeFilter] = useState(''); // State mới cho Dropdown lọc Type
 
-  // --- CODE MỚI THÊM: Quản lý ô nhập số trang ---
+    // --- Quản lý ô nhập số trang ---
     const [inputPage, setInputPage] = useState(1);
     const totalPages = Math.ceil(totalCount / limit) || 1;
 
@@ -47,6 +48,7 @@ const IocManagement = () => {
             setInputPage(value);
         }
     };
+    
     // State quản lý Form
     const [showForm, setShowForm] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -55,11 +57,10 @@ const IocManagement = () => {
     const [showRelForm, setShowRelForm] = useState(false);
     const [relFormData, setRelFormData] = useState({ fromValue: '', toValue: '', relationType: 'related_to' });
 
-    const fetchIocs = async () => {
+   const fetchIocs = useCallback(async () => {
         setLoading(true);
         try {
             const offset = (page - 1) * limit;
-            // Nối động các tham số vào URL
             let url = `/iocnodes/paged?offset=${offset}&limit=${limit}`;
             if (typeFilter) url += `&type=${typeFilter}`;
             if (searchText) url += `&keyword=${searchText}`;
@@ -72,17 +73,19 @@ const IocManagement = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [page, limit, typeFilter, searchText]);
 
     // Nếu gõ tìm kiếm hoặc đổi filter, phải reset về trang 1
     useEffect(() => {
         setPage(1);
     }, [searchText, typeFilter]);
 
-    useEffect(() => { fetchIocs(); }, [page, limit, searchText, typeFilter]);
+    useEffect(() => { 
+        fetchIocs(); 
+    }, [fetchIocs]);
 
     // XÓA IOC
-const handleDelete = async (id) => {
+    const handleDelete = async (id) => {
         if (!window.confirm("Bạn có chắc chắn muốn xóa IOC này không?")) return;
         try { await axiosClient.delete(`/iocnodes/${id}`); fetchIocs(); } 
         catch (err) { alert("Lỗi khi xóa: " + (err.response?.data?.message || err.message)); }
@@ -94,8 +97,57 @@ const handleDelete = async (id) => {
         setShowForm(true);
     };
 
+    // HÀM MỚI: Validate dữ liệu trước khi gửi (Đã tối ưu cho cả Edit và Add)
+    const validateFormData = () => {
+        const { type, value, riskScore, country } = formData;
+        
+        // 1. Chỉ validate Type và Value khi THÊM MỚI (vì Edit không cho sửa trường này)
+        if (!isEditing) {
+            if (type === 'IP') {
+                const ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+                if (!ipRegex.test(value)) {
+                    alert("❌ Lỗi: Địa chỉ IP không hợp lệ! (VD: 192.168.1.1)");
+                    return false;
+                }
+            } else if (type === 'Domain') {
+                const domainRegex = /^(?!:\/\/)([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,11}?$/;
+                if (!domainRegex.test(value)) {
+                    alert("❌ Lỗi: Domain không hợp lệ! (VD: google.com, không bao gồm http://)");
+                    return false;
+                }
+            } else if (type === 'Hash') {
+                const hashRegex = /^([a-fA-F0-9]{32}|[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$/;
+                if (!hashRegex.test(value)) {
+                    alert("❌ Lỗi: Hash không hợp lệ! Phải là định dạng MD5, SHA-1, hoặc SHA-256.");
+                    return false;
+                }
+            }
+        }
+
+        // 2. Validate những trường dùng chung cho cả THÊM và SỬA
+        
+        // Kiểm tra Risk Score (0 - 100)
+        const score = parseInt(riskScore, 10);
+        if (isNaN(score) || score < 0 || score > 100) {
+            alert("❌ Lỗi: Risk Score phải là một số nguyên nằm trong khoảng từ 0 đến 100!");
+            return false;
+        }
+
+        // Kiểm tra Quốc gia (Country) - Tuỳ chọn: Phải là 2 chữ cái (VD: VN, US) nếu có nhập
+        if (country && !/^[a-zA-Z]{2}$/.test(country)) {
+            alert("❌ Lỗi: Mã Quốc gia chỉ được chứa đúng 2 chữ cái (VD: VN, US)!");
+            return false;
+        }
+
+        return true; // Dữ liệu hợp lệ
+    };
+
     const handleSaveIoc = async (e) => {
         e.preventDefault();
+        
+        // DỪNG LẠI NẾU VALIDATE THẤT BẠI
+        if (!validateFormData()) return;
+
         try {
             if (isEditing) {
                 await axiosClient.put(`/iocnodes/${editingId}`, { 
@@ -112,7 +164,7 @@ const handleDelete = async (id) => {
             
             // Thành công thì đóng form và reset dữ liệu
             setShowForm(false);
-            setFormData({ type: 'IP', value: '', riskScore: 0, country: '', tags: [] });
+            setFormData({ type: 'IP', value: '', riskScore: 0, country: '', originRef: 'Manual Entry', tags: [] });
             fetchIocs();
             
         } catch (err) { 
@@ -137,12 +189,8 @@ const handleDelete = async (id) => {
     const handleSaveRelationship = async (e) => {
         e.preventDefault();
         try {
-            // Gọi API POST mà bạn vừa test ngon lành trên Swagger
             const res = await axiosClient.post('/iocnodes/relationship', relFormData);
-            
             alert("✅ " + (res.data.message || 'Nối node thành công!'));
-            
-            // Đóng form và reset dữ liệu
             setShowRelForm(false);
             setRelFormData({ fromValue: '', toValue: '', relationType: 'related_to' });
         } catch (err) { 
@@ -190,7 +238,7 @@ const handleDelete = async (id) => {
                 </div>
             </div>
 
-            {/* FORM NHẬP LIỆU (Tương tự UsersManagement.jsx) */}
+            {/* FORM NHẬP LIỆU */}
             {showForm && (
                 <form onSubmit={handleSaveIoc} style={{ backgroundColor: '#1e293b', padding: '20px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #334155' }}>
                     <h3 style={{ color: '#93c5fd', marginTop: 0 }}>{isEditing ? `✏️ Sửa IOC: ${formData.value}` : '✨ Thêm IOC Mới'}</h3>
@@ -205,7 +253,7 @@ const handleDelete = async (id) => {
                                 <input placeholder="Giá trị (IP/Domain/Hash)" value={formData.value} onChange={e => setFormData({...formData, value: e.target.value})} style={inputStyle} required />
                             </>
                         )}
-                        <input type="number" placeholder="Risk Score (0-100)" value={formData.riskScore} onChange={e => setFormData({...formData, riskScore: e.target.value})} style={inputStyle} />
+                        <input type="number" placeholder="Risk Score (0-100)" min="0" max="100" value={formData.riskScore} onChange={e => setFormData({...formData, riskScore: e.target.value})} style={inputStyle} />
                         <input placeholder="Quốc gia (VD: VN, US)" maxLength="2" value={formData.country} onChange={e => setFormData({...formData, country: e.target.value})} style={inputStyle} />
                         
                         <button type="submit" style={{ backgroundColor: '#16a34a', color: '#fff', padding: '10px 25px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
@@ -218,7 +266,7 @@ const handleDelete = async (id) => {
                                 setShowForm(false);
                                 setIsEditing(false);
                                 setEditingId(null);
-                                setFormData({ type: 'IP', value: '', riskScore: 0, country: '', tags: [] });
+                                setFormData({ type: 'IP', value: '', riskScore: 0, country: '', originRef: 'Manual Entry', tags: [] });
                             }} 
                             style={{ backgroundColor: '#64748b', color: '#fff', padding: '10px 25px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
                             Hủy
@@ -280,7 +328,6 @@ const handleDelete = async (id) => {
                     </tr>
                 </thead>
                 <tbody>
-                    {/* KHÔNG dùng filter của Javascript nữa, lấy thẳng từ Backend */}
                     {iocs.map(ioc => (
                         <tr key={ioc.id} style={{ borderBottom: '1px solid #1e293b' }}>
                             <td style={{ padding: '15px 12px', fontFamily: 'monospace' }}>{ioc.value}</td>
@@ -312,7 +359,7 @@ const handleDelete = async (id) => {
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 16px', backgroundColor: '#1e293b', borderRadius: '6px', color: '#e2e8f0', fontWeight: 'bold' }}>
                         Trang
                         <input
-                            type="text" // Dùng text kết hợp Regex để chặn tuyệt đối dấu chấm phẩy
+                            type="text"
                             value={inputPage}
                             onChange={handleInputPageChange}
                             onKeyDown={handleInputPageSubmit}
@@ -332,8 +379,7 @@ const handleDelete = async (id) => {
         </div>
     );
 };
-// Dán dòng này vào trước dòng export default
+
 const inputStyle = { padding: '10px', borderRadius: '6px', backgroundColor: '#0f172a', color: '#fff', border: '1px solid #475569', minWidth: '150px' };
 
 export default IocManagement;
-

@@ -19,6 +19,8 @@ namespace NT208_Project.Middlewares
             {
                 var username = context.User.FindFirst(ClaimTypes.Name)?.Value;
 
+                var jwtSessionToken = context.User.FindFirst("SessionToken")?.Value;
+
                 if (!string.IsNullOrEmpty(username))
                 {
                     var cursor = await db.Cursor.PostCursorAsync<dynamic>(new PostCursorBody
@@ -31,9 +33,18 @@ namespace NT208_Project.Middlewares
 
                     if (user == null || user.isLocked == true)
                     {
-                        context.Response.StatusCode = 401; 
+                        context.Response.StatusCode = 401;
                         await context.Response.WriteAsJsonAsync(new { message = "Tài khoản của bạn đã bị xóa hoặc bị khóa bởi Admin!" });
-                        return; 
+                        return;
+                    }
+
+                    string dbSessionToken = (string)user.sessionToken;
+
+                    if (!string.IsNullOrEmpty(dbSessionToken) && dbSessionToken != jwtSessionToken)
+                    {
+                        context.Response.StatusCode = 401;
+                        await context.Response.WriteAsJsonAsync(new { message = "Tài khoản của bạn vừa được đăng nhập trên một thiết bị khác!" });
+                        return;
                     }
                 }
             }

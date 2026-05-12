@@ -26,11 +26,10 @@ function SearchPage(){
   // Động cơ vật lý: Tự động chạy lại mỗi khi graphData thay đổi (kéo thêm node)
   useEffect(() => {
     if (fgRef.current) {
-      // Đẩy tụi nó văng xa ra nhau
-      fgRef.current.d3Force('charge').strength(-400);
-      // Nới lỏng dây thừng
-      fgRef.current.d3Force('link').distance(120);
-      // Khởi động lại engine
+      // Tăng lực đẩy từ -400 lên -800 để tụi nó né nhau ra xa hơn
+      fgRef.current.d3Force('charge').strength(-800);
+      // Nới khoảng cách dây nối ra một chút
+      fgRef.current.d3Force('link').distance(150);
       fgRef.current.d3ReheatSimulation();
     }
   }, [graphData]);
@@ -97,6 +96,10 @@ function SearchPage(){
         })).filter(l => l.source && l.target && nodeMap.has(l.source) && nodeMap.has(l.target));
 
         setGraphData({ nodes: safeNodes, links: safeLinks });
+
+        // ĐÃ FIX BỆNH "TUA LẠI PHIM CŨ": Báo cho sổ tay biết tâm điểm đã load sẵn 50 node
+        expandStatsRef.current = {}; 
+        expandStatsRef.current[searchKey] = 50; 
       }
     } catch(error) {
       if (error.response && error.response.status === 404) {
@@ -126,7 +129,8 @@ function SearchPage(){
         return;
       }
 
-      expandStatsRef.current[nodeKey] = currentSkip + 30;
+      // ĐÃ SỬA: Đổi số lượng thành 20 để đồng bộ với Backend
+      expandStatsRef.current[nodeKey] = currentSkip + 20;
 
       setGraphData(prevData => {
         const existingNodeIds = new Set(prevData.nodes.map(n => n.id));
@@ -142,8 +146,9 @@ function SearchPage(){
               name: n.name || "Unknown",
               val: Number(n.val) || 5,
               color: color,
-              x: node.x, 
-              y: node.y 
+              // ĐÃ FIX BỆNH "NÚT TÀNG HÌNH": Tăng độ nảy toạ độ ngẫu nhiên từ 20 lên 50 để các node văng ra xa nhau
+              x: node.x + (Math.random() - 0.5) * 50, 
+              y: node.y + (Math.random() - 0.5) * 50 
             };
           });
 
@@ -267,19 +272,18 @@ function SearchPage(){
 
              {graphData.nodes.length > 0 ? (
                <ForceGraph2D
-                  ref={fgRef} // ĐÃ CẬP NHẬT REF
+                  ref={fgRef}
                   graphData={graphData}
                   width={700}
                   height={500}
                   linkColor={() => 'rgba(255, 255, 255, 0.2)'}
                   linkWidth={1.5}
-                  linkLabel="" // ĐÃ TẮT LABEL CỦA DÂY NỐI
+                  linkLabel=""
                   linkDirectionalArrowLength={4}
                   linkDirectionalArrowRelPos={1}
                   onNodeClick={(node) => setSelectedNode(node)} 
                   onNodeRightClick={handleNodeRightClick} 
                   
-                  // ĐÃ THÊM SỰ KIỆN HOVER CHUỘT
                   onNodeHover={node => setHoverNode(node)}
 
                   nodeCanvasObject={(node, ctx, globalScale) => {
@@ -304,7 +308,6 @@ function SearchPage(){
                           ctx.stroke();
                       }
 
-                      // ĐÃ CẬP NHẬT THUẬT TOÁN GIẤU CHỮ (Chỉ hiện khi hover, select hoặc zoom to)
                       const isHovered = hoverNode && hoverNode.id === node.id;
                       const isSelected = selectedNode && selectedNode.id === node.id;
                       const isZoomedIn = globalScale > 2.5;
