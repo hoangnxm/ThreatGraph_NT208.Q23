@@ -14,7 +14,7 @@ namespace IocNodes.Services
     {
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IIocNodeService _iocService;
-        private readonly IIocNodeRepository _iocRepo; 
+        private readonly IIocNodeRepository _iocRepo;
         private readonly ILogger<DataFeedService> _logger;
 
         public DataFeedService(
@@ -74,6 +74,9 @@ namespace IocNodes.Services
 
                     // --- BƯỚC 2: QUÉT TRỰC TIẾP INDICATORS TỪ PULSE ---
                     // (Không cần phải gọi API móc ruột nữa vì nó có sẵn rồi)
+                    string? previousIocKey = null;
+                    string? firstIocKey = null;
+
                     foreach (var ind in pulse.Indicators.Take(100))
                     {
                         var mappedType = MapOtxTypeToSystemType(ind.Type);
@@ -120,7 +123,29 @@ namespace IocNodes.Services
                                 addedCount++;
                             }
                             catch { } // Lỗi trùng lặp relationship thì bỏ qua
+
+                            if (!string.IsNullOrEmpty(previousIocKey) && iocKey != previousIocKey)
+                            {
+                                try
+                                {
+                                    await _iocRepo.CreateRelationshipAsync(iocKey, previousIocKey, "related_ioc", "AlienVault Ring Topology");
+                                }
+                                catch { }
+                            }
+
+                            if (firstIocKey == null) firstIocKey = iocKey;
+
+                            previousIocKey = iocKey;
                         }
+                    }
+
+                    if (!string.IsNullOrEmpty(previousIocKey) && !string.IsNullOrEmpty(firstIocKey) && previousIocKey != firstIocKey)
+                    {
+                        try
+                        {
+                            await _iocRepo.CreateRelationshipAsync(previousIocKey, firstIocKey, "related_ioc", "AlienVault Ring Topology");
+                        }
+                        catch { }
                     }
                 }
             }

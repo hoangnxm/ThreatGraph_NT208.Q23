@@ -33,6 +33,7 @@ namespace NT208_Project.Controllers
                     
                     LET paths = (
                         FOR v, e, p IN 1..1 ANY startNodeId IocRelationships 
+                        FILTER v.Type != 'Campaign'
                         SORT v._id ASC // ĐÃ THÊM: Sắp xếp để không bị lộn xộn
                         LIMIT 50 // Giới hạn 50 node để tránh nổ UI ngay từ đầu
                         RETURN { vertex: v, edge: e }
@@ -55,6 +56,7 @@ namespace NT208_Project.Controllers
                         }
                     )
                     
+                    LET allVisibleIds = APPEND(paths[*]._id, [startNodeId])
                     LET links = (
                         FOR p IN paths 
                         FILTER p.edge != null 
@@ -70,6 +72,7 @@ namespace NT208_Project.Controllers
                     LET rootDaysOld = HAS(rootNode, 'CreatedAt') ? DATE_DIFF(rootNode.CreatedAt, DATE_NOW(), 'day') : 0
                     LET rootDecay = FLOOR(rootDaysOld / 7) * 5
                     LET rootScore = MAX([0, rootNode.RiskScore - rootDecay])
+                    
                     
                     LET rootNodeFormatted = { 
                         id: rootNode._id, 
@@ -113,6 +116,7 @@ namespace NT208_Project.Controllers
                     
                     LET paths = (
                         FOR v, e, p IN 1..1 ANY startNodeId IocRelationships 
+                        FILTER v.Type != 'Campaign'
                         SORT v._id ASC // ĐÃ THÊM: Sắp xếp để phân trang chính xác
                         LIMIT @skip, 20 // ĐÃ ĐỔI: Lấy 20 node mỗi lần click
                         RETURN { vertex: v, edge: e }
@@ -145,6 +149,7 @@ namespace NT208_Project.Controllers
                         }
                     )
                     
+                    LET allVisibleIds = APPEND(paths[*]._id, [startNodeId])
                     LET links = (
                         FOR p IN paths 
                         FILTER p.edge != null 
