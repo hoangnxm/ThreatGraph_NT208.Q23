@@ -8,6 +8,7 @@ import { jwtDecode } from 'jwt-decode';
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 const Dashboard = () => {
+    // Đã sửa lại state mặc định an toàn tuyệt đối
     const [stats, setStats] = useState({ 
         totalUsers: 0, totalLogs: 0, totalIocs: 0, iocsToday: 0, totalEdges: 0, topIps: [] 
     });
@@ -25,6 +26,8 @@ const Dashboard = () => {
         const fetchData = async () => {
             try {
                 const res = await axiosClient.get('/Dashboard/stats');
+                
+                // Khiên chống đạn: Bắt cả chữ hoa lẫn chữ thường từ C# trả về
                 setStats({
                     totalUsers: res.data.totalUsers ?? res.data.TotalUsers ?? 0,
                     totalLogs: res.data.totalLogs ?? res.data.TotalLogs ?? 0,
@@ -34,12 +37,12 @@ const Dashboard = () => {
                     topIps: res.data.topIps ?? res.data.TopIps ?? []
                 });
 
-                // Giả lập dữ liệu Pie Chart từ IocNodes thực tế
                 const iocRes = await axiosClient.get('/iocnodes/paged?limit=1000');
                 const iocList = iocRes.data?.items || [];
                 const counts = { IP: 0, Domain: 0, Hash: 0 };
+                
                 iocList.forEach(i => {
-                    const type = i.type || i.Type;  
+                    const type = i.type || i.Type; // Đề phòng lỗi tương tự ở IocNodes
                     if (type === 'IP') counts.IP++;
                     else if (type === 'Domain') counts.Domain++;
                     else counts.Hash++;
@@ -60,21 +63,25 @@ const Dashboard = () => {
 
     return (
         <div style={{ color: '#fff', padding: '20px' }}>
-            <h2>📊 HỆ THỐNG GIÁM SÁT IOC</h2>
-
-            {/* CARD CHO ADMIN */}
-            {userRole === 'Admin' && (
+            <h2>HỆ THỐNG GIÁM SÁT IOC</h2>
+            // Chỉ Admin mới thấy 2 chỉ số này
+           {userRole === 'Admin' && (
                 <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
-                    <div style={adminCardStyle}>👥 Users: {stats.TotalUsers}</div>
-                    <div style={adminCardStyle}>📜 Logs: {stats.TotalLogs}</div>
+                    <div style={adminCardStyle}>👥 Users: {stats.totalUsers}</div>
+                    <div style={adminCardStyle}>📜 Logs: {stats.totalLogs}</div>
                 </div>
             )}
-
-            {/* 3 CARD CHO MỌI USER */}
+            // Dù là User hay Admin cũng đều thấy 3 chỉ số này
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
-                <div style={userCardStyle}>🦠 Tổng IOC: {stats.TotalIocs}</div>
-                <div style={userCardStyle}>🔥 Thêm hôm nay: {stats.IocsToday}</div>
-                <div style={userCardStyle}>🕸️ Edges: {stats.TotalEdges}</div>
+                <div style={userCardStyle}>Tổng IOC: {stats.totalIocs}</div>
+                <div style={userCardStyle}>Thêm hôm nay: {stats.iocsToday}</div>
+                <div style={userCardStyle}>Edges: {stats.totalEdges}</div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
+                <div style={userCardStyle}>Tổng IOC: {stats.totalIocs}</div>
+                <div style={userCardStyle}>Thêm hôm nay: {stats.iocsToday}</div>
+                <div style={userCardStyle}>Edges: {stats.totalEdges}</div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginTop: '30px' }}>
@@ -90,10 +97,10 @@ const Dashboard = () => {
                     <table style={{ width: '100%', textAlign: 'left' }}>
                         <thead><tr><th>IP</th><th>Nguồn</th></tr></thead>
                         <tbody>
-                            {stats.TopIps?.map((ip, i) => (
-                                <tr key={i} onClick={() => navigate(`/search?query=${ip.Value}`)} style={{ cursor: 'pointer' }}>
-                                    <td style={{ color: '#ef4444' }}>{ip.Value}</td>
-                                    <td>{ip.Source}</td>
+                            {stats.topIps.map((ip, i) => (
+                                <tr key={i} onClick={() => navigate(`/search?query=${ip.value || ip.Value}`)} style={{ cursor: 'pointer' }}>
+                                    <td style={{ color: '#ef4444' }}>{ip.value || ip.Value}</td>
+                                    <td>{ip.source || ip.Source}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -104,7 +111,6 @@ const Dashboard = () => {
     );
 };
 
-// Style tạm thời
 const adminCardStyle = { background: '#1e293b', padding: '20px', borderRadius: '10px', flex: 1, borderLeft: '5px solid #3b82f6' };
 const userCardStyle = { background: '#0f172a', padding: '30px', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', border: '1px solid #334155' };
 const chartBoxStyle = { background: '#0f172a', padding: '20px', borderRadius: '15px' };
