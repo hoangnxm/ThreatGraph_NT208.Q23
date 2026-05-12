@@ -27,7 +27,7 @@ const Dashboard = () => {
             try {
                 const res = await axiosClient.get('/Dashboard/stats');
                 
-                // Khiên chống đạn: Bắt cả chữ hoa lẫn chữ thường từ C# trả về
+                // Đã sửa lại phần gán dữ liệu để tránh lỗi do API trả về sai định dạng
                 setStats({
                     totalUsers: res.data.totalUsers ?? res.data.TotalUsers ?? 0,
                     totalLogs: res.data.totalLogs ?? res.data.TotalLogs ?? 0,
@@ -42,7 +42,7 @@ const Dashboard = () => {
                 const counts = { IP: 0, Domain: 0, Hash: 0 };
                 
                 iocList.forEach(i => {
-                    const type = i.type || i.Type; // Đề phòng lỗi tương tự ở IocNodes
+                    const type = i.type || i.Type;
                     if (type === 'IP') counts.IP++;
                     else if (type === 'Domain') counts.Domain++;
                     else counts.Hash++;
@@ -67,8 +67,8 @@ const Dashboard = () => {
             // Chỉ Admin mới thấy 2 chỉ số này
            {userRole === 'Admin' && (
                 <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
-                    <div style={adminCardStyle}>👥 Users: {stats.totalUsers}</div>
-                    <div style={adminCardStyle}>📜 Logs: {stats.totalLogs}</div>
+                    <div style={adminCardStyle}>Users: {stats.totalUsers}</div>
+                    <div style={adminCardStyle}>Logs: {stats.totalLogs}</div>
                 </div>
             )}
             // Dù là User hay Admin cũng đều thấy 3 chỉ số này
