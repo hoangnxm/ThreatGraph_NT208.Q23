@@ -172,7 +172,7 @@ namespace IocNodes.Controllers
             try
             {
                 // Giả sử ông đã thêm phương thức vào Service tương ứng
-                await _iocService.DeleteAllAsync();
+                await _service.DeleteAllAsync();
                 return Ok(new { message = "Đã xóa sạch toàn bộ dữ liệu IOC và các mối quan hệ!" });
             }
             catch (Exception ex)
