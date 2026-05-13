@@ -8,9 +8,9 @@ import { jwtDecode } from 'jwt-decode';
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 const Dashboard = () => {
-    // Đã sửa lại state mặc định an toàn tuyệt đối
+    // 1. Đổi topIps thành topIocs
     const [stats, setStats] = useState({ 
-        totalUsers: 0, totalLogs: 0, totalIocs: 0, iocsToday: 0, totalEdges: 0, topIps: [] 
+        totalUsers: 0, totalLogs: 0, totalIocs: 0, iocsToday: 0, totalEdges: 0, topIocs: [] 
     });
     const [chartData, setChartData] = useState(null);
     const [userRole, setUserRole] = useState('');
@@ -27,14 +27,14 @@ const Dashboard = () => {
             try {
                 const res = await axiosClient.get('/Dashboard/stats');
                 
-                // Đã sửa lại phần gán dữ liệu để tránh lỗi do API trả về sai định dạng
+                // 2. Nhận dữ liệu TopIocs từ API
                 setStats({
                     totalUsers: res.data.totalUsers ?? res.data.TotalUsers ?? 0,
                     totalLogs: res.data.totalLogs ?? res.data.TotalLogs ?? 0,
                     totalIocs: res.data.totalIocs ?? res.data.TotalIocs ?? 0,
                     iocsToday: res.data.iocsToday ?? res.data.IocsToday ?? 0,
                     totalEdges: res.data.totalEdges ?? res.data.TotalEdges ?? 0,
-                    topIps: res.data.topIps ?? res.data.TopIps ?? []
+                    topIocs: res.data.topIocs ?? res.data.TopIocs ?? []
                 });
 
                 const iocRes = await axiosClient.get('/iocnodes/paged?limit=1000');
@@ -61,6 +61,12 @@ const Dashboard = () => {
         fetchData();
     }, []);
 
+    const getTypeColor = (type) => {
+        if (type === 'IP') return '#ef4444';
+        if (type === 'Domain') return '#3b82f6';
+        return '#f59e0b'; // Hash
+    };
+
     return (
         <div style={{ color: '#fff', padding: '20px' }}>
             <h2>HỆ THỐNG GIÁM SÁT IOC</h2>
@@ -76,7 +82,7 @@ const Dashboard = () => {
                 <div style={userCardStyle}>Edges: {stats.totalEdges}</div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginTop: '30px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '30px', marginTop: '30px' }}>
                 <div style={chartBoxStyle}>
                     <h3>Tỉ lệ mã độc</h3>
                     <div style={{ height: '250px' }}>
@@ -85,21 +91,41 @@ const Dashboard = () => {
                 </div>
 
                 <div style={chartBoxStyle}>
-                    <h3>Top 10 IP Nguy Hiểm</h3>
-                    <table style={{ width: '100%', textAlign: 'left' }}>
-                        <thead><tr><th>IP</th><th>Nguồn</th></tr></thead>
+                    {/* 3. Đổi tên và cấu trúc bảng Xếp hạng */}
+                    <h3>Bảng Xếp Hạng IOC (Top 10)</h3>
+                    <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '1px solid #334155' }}>
+                                <th style={{ padding: '10px 0' }}>Loại</th>
+                                <th style={{ padding: '10px 0' }}>Giá trị</th>
+                                <th style={{ padding: '10px 0' }}>Nguồn</th>
+                                <th style={{ padding: '10px 0' }}>Điểm</th>
+                            </tr>
+                        </thead>
                         <tbody>
-                            {stats.topIps && stats.topIps.length > 0 ? (
-                                stats.topIps.map((ip, i) => (                             
-                                    <tr key={i} onClick={() => navigate(`/search?query=${ip.value || ip.Value}`)} style={{ cursor: 'pointer' }}>
-                                        <td style={{ color: '#ef4444' }}>{ip.value || ip.Value}</td>
-                                        <td>{ip.originRef || ip.OriginRef || 'Unknown'}</td>
-                                    </tr>
-                                ))
+                            {stats.topIocs && stats.topIocs.length > 0 ? (
+                                stats.topIocs.map((ioc, i) => {
+                                    const iocType = ioc.type || ioc.Type;
+                                    return (                             
+                                        <tr key={i} onClick={() => navigate(`/search?query=${ioc.value || ioc.Value}`)} style={{ cursor: 'pointer', borderBottom: '1px solid #1e293b' }}>
+                                            <td style={{ padding: '10px 0' }}>
+                                                <span style={{
+                                                    background: getTypeColor(iocType),
+                                                    padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold'
+                                                }}>
+                                                    {iocType}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: '10px 0', wordBreak: 'break-all', paddingRight: '10px' }}>{ioc.value || ioc.Value}</td>
+                                            <td style={{ padding: '10px 0', color: '#94a3b8' }}>{ioc.originRef || ioc.OriginRef || 'Unknown'}</td>
+                                            <td style={{ padding: '10px 0', color: '#ef4444', fontWeight: 'bold' }}>{ioc.riskScore || ioc.RiskScore || 0}</td>
+                                        </tr>
+                                    );
+                                })
                             ) : (
                                 <tr>
-                                    <td colSpan="2" style={{ textAlign: 'center', color: '#94a3b8' }}>
-                                        Chưa có dữ liệu IP nguy hiểm
+                                    <td colSpan="4" style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 0' }}>
+                                        Chưa có dữ liệu IOC
                                     </td>
                                 </tr>
                             )}
@@ -114,5 +140,3 @@ const Dashboard = () => {
 const adminCardStyle = { background: '#1e293b', padding: '20px', borderRadius: '10px', flex: 1, borderLeft: '5px solid #3b82f6' };
 const userCardStyle = { background: '#0f172a', padding: '30px', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', border: '1px solid #334155' };
 const chartBoxStyle = { background: '#0f172a', padding: '20px', borderRadius: '15px' };
-
-export default Dashboard;
