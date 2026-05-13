@@ -1,14 +1,18 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace IocNodes.DTOs
 {
-    // Class hứng toàn bộ response từ AlienVault
     public class OtxPulseResponse
     {
+        // THÊM DÒNG NÀY ĐỂ CHẠY ĐƯỢC VÒNG LẶP WHILE
+        [JsonPropertyName("next")]
+        public string? Next { get; set; }
+
         public List<OtxPulse> Results { get; set; } = new();
     }
 
-    // Một Pulse giống như một bài báo cáo về 1 chiến dịch tấn công
     public class OtxPulse
     {
         public string Id { get; set; } = string.Empty;
@@ -27,11 +31,11 @@ namespace IocNodes.DTOs
     {
         public List<OtxIndicator> Results { get; set; } = new();
     }
-    // Indicator chính là các IOC (IP, Domain, Hash)
+
     public class OtxIndicator
     {
-        public string Indicator { get; set; } = string.Empty; // Giá trị (VD: 8.8.8.8)
-        public string Type { get; set; } = string.Empty;      // Loại (VD: IPv4, hostname)
+        public string Indicator { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
 
         public int? IsActive { get; set; }
@@ -39,6 +43,4 @@ namespace IocNodes.DTOs
         public string Role { get; set; } = string.Empty;
         public DateTime? Expiration { get; set; }
     }
-
-
 }

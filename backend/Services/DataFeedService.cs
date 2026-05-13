@@ -4,6 +4,7 @@ using IocNodes.DTOs;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
@@ -28,50 +29,45 @@ namespace IocNodes.Services
             _iocRepo = iocRepo;
             _logger = logger;
         }
+
+        // Hàm băm thuật toán để sinh Key cố định (Deterministic Key)
+        private string GenerateDeterministicKey(string input)
+        {
+            using (var sha256 = System.Security.Cryptography.SHA256.Create())
+            {
+                var bytes = System.Text.Encoding.UTF8.GetBytes(input.ToLowerInvariant().Trim());
+                var hash = sha256.ComputeHash(bytes);
+                return BitConverter.ToString(hash).Replace("-", "").ToLower();
+            }
+        }
+
         private int CalculateDynamicRiskScore(OtxPulse pulse, OtxIndicator indicator)
         {
             int score = 0;
-
-            // 1. Trạng thái hoạt động
-            if (indicator.IsActive == 1) score += 20;
-            else score += 5;
-
-            // Trừ điểm nếu đã quá hạn
-            if (indicator.Expiration.HasValue && indicator.Expiration.Value < DateTime.UtcNow)
-            {
-                score -= 15;
-            }
-
-            // 2. Độ phổ biến (Observations)
+            if (indicator.IsActive == 1) score += 20; else score += 5;
+            if (indicator.Expiration.HasValue && indicator.Expiration.Value < DateTime.UtcNow) score -= 15;
             if (indicator.Observations > 100) score += 15;
             else if (indicator.Observations > 10) score += 10;
             else if (indicator.Observations > 0) score += 5;
 
-            // 3. Vai trò (Role) & Phân loại (Type)
             string roleStr = (indicator.Role ?? "").ToLower();
-            if (roleStr.Contains("c2") || roleStr.Contains("malware") || roleStr.Contains("phishing") || roleStr.Contains("exploit"))
-                score += 10;
+            if (roleStr.Contains("c2") || roleStr.Contains("malware") || roleStr.Contains("phishing") || roleStr.Contains("exploit")) score += 10;
 
-            // Type cũ của ông viết hoa hay thường thì cứ dùng thuộc tính của ông nhé
             string typeStr = (indicator.Type ?? "").ToLower();
             if (typeStr.Contains("hash") || typeStr.Contains("md5") || typeStr.Contains("sha")) score += 10;
             else if (typeStr.Contains("domain") || typeStr.Contains("hostname")) score += 7;
             else if (typeStr.Contains("ipv4") || typeStr.Contains("ipv6")) score += 5;
 
-            // 4. Mức độ nhạy cảm (TLP)
             string tlp = (pulse.TLP ?? "").ToLower();
             if (tlp == "red") score += 20;
             else if (tlp == "amber") score += 15;
             else if (tlp == "green") score += 10;
             else if (tlp == "white") score += 5;
 
-            // 5. Mức độ tinh vi (Adversary - Nhóm APT)
             if (!string.IsNullOrWhiteSpace(pulse.Adversary)) score += 15;
-
-            // 6. Nhắm mục tiêu cụ thể
             if (pulse.TargetedCountries != null && pulse.TargetedCountries.Count > 0) score += 5;
             if (pulse.Industries != null && pulse.Industries.Count > 0) score += 5;
-            // 7. Độ uy tín và Cập nhật
+
             if (pulse.References != null)
             {
                 if (pulse.References.Count > 2) score += 10;
@@ -79,137 +75,105 @@ namespace IocNodes.Services
             }
             if (pulse.Revision > 5) score += 5;
 
-            // Cân bằng điểm
             return Math.Max(1, Math.Min(100, score));
         }
 
         public async Task<int> SyncAlienVaultDataAsync()
         {
             var client = _httpClientFactory.CreateClient("AlienVaultClient");
-            int addedCount = 0;
+            int totalAdded = 0;
+            string currentUrl = "pulses/subscribed?limit=20"; // Limit vừa phải để không nghẽn mạng
 
             try
             {
-                // Quay về dùng subscribed, tăng limit lên 10 để kéo cho sướng
-                var response = await client.GetFromJsonAsync<OtxPulseResponse>("pulses/subscribed?limit=10");
-                if (response?.Results == null) return 0;
-
-                foreach (var pulse in response.Results)
+                while (!string.IsNullOrEmpty(currentUrl))
                 {
-                    // --- BƯỚC 1: TẠO NODE CAMPAIGN CHA ---
-                    string campaignKey = string.Empty;
-                    string pulseName = string.IsNullOrWhiteSpace(pulse.Name) ? $"Campaign_{pulse.Id}" : pulse.Name;
+                    var response = await client.GetFromJsonAsync<OtxPulseResponse>(currentUrl);
+                    if (response?.Results == null || !response.Results.Any()) break;
 
-                    var existingCamp = await _iocRepo.GetByValueAsync(pulseName);
+                    var nodesToUpsert = new List<IocNode>();
+                    var edgesToInsert = new List<dynamic>();
 
-                    if (existingCamp != null && !string.IsNullOrEmpty(existingCamp.Key))
+                    foreach (var pulse in response.Results)
                     {
-                        campaignKey = existingCamp.Key;
-                    }
-                    else
-                    {
-                        var campReq = new CreateIocNodeRequest
+                        string campaignIdStr = $"Campaign_{pulse.Id}";
+                        string campaignKey = GenerateDeterministicKey(campaignIdStr);
+                        string pulseName = string.IsNullOrWhiteSpace(pulse.Name) ? campaignIdStr : pulse.Name;
+
+                        nodesToUpsert.Add(new IocNode
                         {
+                            Key = campaignKey,
                             Type = "Campaign",
                             Value = pulseName,
                             RiskScore = 90,
                             OriginRef = "AlienVault OTX",
                             Tags = new List<string> { "Pulse" }
-                        };
-                        try
+                        });
+
+                        string? previousIocKey = null;
+                        string? firstIocKey = null;
+
+                        foreach (var ind in pulse.Indicators)
                         {
-                            var createdCamp = await _iocService.CreateAsync(campReq);
-                            campaignKey = createdCamp.Id;
-                        }
-                        catch { continue; }
-                    }
+                            var mappedType = MapOtxTypeToSystemType(ind.Type);
+                            if (mappedType == null) continue;
 
-                    if (string.IsNullOrEmpty(campaignKey)) continue;
+                            string cleanValue = ind.Indicator.Trim();
+                            string iocKey = GenerateDeterministicKey(cleanValue);
+                            int dynamicScore = CalculateDynamicRiskScore(pulse, ind);
 
-                    // --- BƯỚC 2: QUÉT TRỰC TIẾP INDICATORS TỪ PULSE ---
-                    // (Không cần phải gọi API móc ruột nữa vì nó có sẵn rồi)
-                    string? previousIocKey = null;
-                    string? firstIocKey = null;
-
-                    foreach (var ind in pulse.Indicators.Take(100))
-                    {
-                        // Gọi hàm map của ông (Lưu ý: tùy cách ông viết DTO, Type có thể là Type hoặc type)
-                        var mappedType = MapOtxTypeToSystemType(ind.Type);
-                        if (mappedType == null) continue;
-
-                        string cleanValue = ind.Indicator.Trim();
-                        string iocKey = string.Empty;
-
-                        // ==========================================
-                        // GỌI HÀM TÍNH ĐIỂM Ở NGAY ĐÂY
-                        // ==========================================
-                        int dynamicScore = CalculateDynamicRiskScore(pulse, ind);
-
-                        var existingIoc = await _iocRepo.GetByValueAsync(cleanValue);
-
-                        if (existingIoc != null && !string.IsNullOrEmpty(existingIoc.Key))
-                        {
-                            iocKey = existingIoc.Key;
-                            // (Lưu ý: Nếu node đã tồn tại, code hiện tại của ông chỉ lấy Key chứ chưa update điểm mới. 
-                            // Tạm thời cứ giữ nguyên thế này để an toàn, không phá luồng cũ).
-                        }
-                        else
-                        {
-                            var iocReq = new CreateIocNodeRequest
+                            nodesToUpsert.Add(new IocNode
                             {
+                                Key = iocKey,
                                 Type = mappedType,
                                 Value = cleanValue,
-                                // THAY VÌ 70, GÁN BIẾN ĐÃ TÍNH VÀO ĐÂY
                                 RiskScore = dynamicScore,
                                 OriginRef = "AlienVault OTX",
                                 Tags = new List<string> { "OTX", "AutoSync" }
-                            };
-                            try
-                            {
-                                var createdIoc = await _iocService.CreateAsync(iocReq);
-                                iocKey = createdIoc.Id;
-                            }
-                            catch { continue; }
-                        }
+                            });
 
-                        // Nối đồ thị
-                        if (!string.IsNullOrEmpty(iocKey))
-                        {
-                            try
+                            edgesToInsert.Add(new
                             {
-                                await _iocRepo.CreateRelationshipAsync(
-                                    fromKey: iocKey,
-                                    toKey: campaignKey,
-                                    relationType: "belongs_to",
-                                    originRef: "AlienVault AutoSync"
-                                );
-                                addedCount++;
-                            }
-                            catch { } // Lỗi trùng lặp relationship thì bỏ qua
+                                _from = $"IocNodes/{iocKey}",
+                                _to = $"IocNodes/{campaignKey}",
+                                RelationType = "belongs_to",
+                                OriginRef = "AlienVault AutoSync"
+                            });
 
                             if (!string.IsNullOrEmpty(previousIocKey) && iocKey != previousIocKey)
                             {
-                                try
-                                {
-                                    await _iocRepo.CreateRelationshipAsync(iocKey, previousIocKey, "related_ioc", "AlienVault Ring Topology");
-                                }
-                                catch { }
+                                edgesToInsert.Add(new { _from = $"IocNodes/{iocKey}", _to = $"IocNodes/{previousIocKey}", RelationType = "related_ioc" });
                             }
-
                             if (firstIocKey == null) firstIocKey = iocKey;
-
                             previousIocKey = iocKey;
+
+                            // Đẩy xuống DB mỗi khi gom đủ 2000 dòng để giải phóng RAM
+                            if (nodesToUpsert.Count >= 2000)
+                            {
+                                await _iocRepo.BulkUpsertNodesAsync(nodesToUpsert);
+                                await _iocRepo.BulkInsertEdgesAsync(edgesToInsert);
+                                totalAdded += nodesToUpsert.Count;
+                                nodesToUpsert.Clear();
+                                edgesToInsert.Clear();
+                            }
+                        }
+
+                        if (!string.IsNullOrEmpty(previousIocKey) && !string.IsNullOrEmpty(firstIocKey) && previousIocKey != firstIocKey)
+                        {
+                            edgesToInsert.Add(new { _from = $"IocNodes/{previousIocKey}", _to = $"IocNodes/{firstIocKey}", RelationType = "related_ioc" });
                         }
                     }
 
-                    if (!string.IsNullOrEmpty(previousIocKey) && !string.IsNullOrEmpty(firstIocKey) && previousIocKey != firstIocKey)
+                    // Đẩy nốt phần dư trước khi qua trang kế
+                    if (nodesToUpsert.Any())
                     {
-                        try
-                        {
-                            await _iocRepo.CreateRelationshipAsync(previousIocKey, firstIocKey, "related_ioc", "AlienVault Ring Topology");
-                        }
-                        catch { }
+                        await _iocRepo.BulkUpsertNodesAsync(nodesToUpsert);
+                        await _iocRepo.BulkInsertEdgesAsync(edgesToInsert);
+                        totalAdded += nodesToUpsert.Count;
                     }
+
+                    // Gán URL trang tiếp theo để lặp
+                    currentUrl = response.Next;
                 }
             }
             catch (Exception ex)
@@ -217,8 +181,8 @@ namespace IocNodes.Services
                 _logger.LogError($"Lỗi cào dữ liệu: {ex.Message}");
             }
 
-            _logger.LogInformation($"[Sync] Đã kéo và nối thành công {addedCount} IOCs mới.");
-            return addedCount;
+            _logger.LogInformation($"[Sync] Đã kéo và nối thành công {totalAdded} IOCs bằng Batch Processing.");
+            return totalAdded;
         }
 
         private string? MapOtxTypeToSystemType(string otxType)
@@ -229,7 +193,5 @@ namespace IocNodes.Services
             if (type.Contains("hash") || type == "md5" || type == "sha1" || type == "sha256") return "Hash";
             return null;
         }
-
-
     }
 }

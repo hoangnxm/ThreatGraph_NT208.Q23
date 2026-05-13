@@ -99,6 +99,38 @@ namespace backend.Repositories
             return result.Result.FirstOrDefault();
         }
 
+        // Thêm 2 hàm này vào bên trong class IocNodeRepository
+        public async Task BulkUpsertNodesAsync(List<IocNode> nodes)
+        {
+            // CỐ ĐỊNH CHUẨN: Dùng _key (đã được hash trên RAM) để kiểm tra tồn tại.
+            // Lưu ý: Trong C#, thuộc tính là Key, nhưng khi parse xuống ArangoDB nó thường được hiểu là _key
+            var query = @"
+        FOR doc IN @nodes
+        UPSERT { _key: doc.Key } 
+        INSERT doc
+        UPDATE { RiskScore: doc.RiskScore, UpdatedAt: DATE_NOW() } IN @@collection
+    ";
+
+            var bindVars = new Dictionary<string, object>
+    {
+        { "@collection", CollectionName },
+        { "nodes", nodes }
+    };
+
+            await _dbClient.Cursor.PostCursorAsync<dynamic>(new PostCursorBody { Query = query, BindVars = bindVars });
+        }
+
+        public async Task BulkInsertEdgesAsync(List<dynamic> edges)
+        {
+            var query = @"
+        FOR edge IN @edges
+        INSERT edge INTO IocRelationships OPTIONS { ignoreErrors: true }
+    ";
+
+            var bindVars = new Dictionary<string, object> { { "edges", edges } };
+            await _dbClient.Cursor.PostCursorAsync<dynamic>(new PostCursorBody { Query = query, BindVars = bindVars });
+        }
+
         public async Task<bool> CreateRelationshipAsync(string fromKey, string toKey, string relationType, string originRef)
         {
             var query = @"
