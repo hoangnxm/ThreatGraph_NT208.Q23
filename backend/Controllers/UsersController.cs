@@ -108,11 +108,11 @@ namespace NT208_Project.Controllers
                 }
                 string updateQuery;
                 var bindVars = new Dictionary<string, object>
-            {
-                { "key", key },
-                { "role", string.IsNullOrEmpty(updateData.role) ? "User" : updateData.role },
-                { "isLocked", updateData.isLocked ?? false }
-            };
+                {
+                    { "key", key },
+                    { "role", string.IsNullOrEmpty(updateData.role) ? "User" : updateData.role },
+                    { "isLocked", updateData.isLocked ?? false }
+                };
 
                 if (!string.IsNullOrWhiteSpace(updateData.password))
                 {
@@ -121,7 +121,7 @@ namespace NT208_Project.Controllers
                 }
                 else
                 {
-                    updateQuery = "UPDATE @key WITH {role: @role, isLocked: @isLocked } IN Users";
+                    updateQuery = "UPDATE @key WITH { role: @role, isLocked: @isLocked } IN Users";
                 }
 
                 await _db.Cursor.PostCursorAsync<object>(new PostCursorBody

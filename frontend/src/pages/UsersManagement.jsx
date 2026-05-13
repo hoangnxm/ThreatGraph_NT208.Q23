@@ -128,12 +128,16 @@ const UsersManagement = () => {
                     </h3>
                     <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
                         <input 
-                            required placeholder="Username" 
-                            value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})}
-                            disabled={isEditing}
+                            required 
+                            placeholder="Username" 
+                            value={formData.username} 
+                            onChange={e => setFormData({...formData, username: e.target.value})}
+                            disabled={isEditing} 
                             style={{ 
-                                flex: 1, padding: '10px', borderRadius: '6px', 
-                                backgroundColor: isEditing ? '#334155' : '#0f172a',
+                                flex: 1, 
+                                padding: '10px', 
+                                borderRadius: '6px', 
+                                backgroundColor: isEditing ? '#334155' : '#0f172a', 
                                 color: isEditing ? '#94a3b8' : '#fff', 
                                 border: '1px solid #475569',
                                 cursor: isEditing ? 'not-allowed' : 'text'
