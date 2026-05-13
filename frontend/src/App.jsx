@@ -11,7 +11,23 @@ import DataFeeds from './pages/DataFeeds';
 import { useEffect } from 'react';
 
 function App() {
-  const token = localStorage.getItem('token');
+  const isTokenValid = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return false;
+    try {
+      const decoded = jwtDecode(token);
+      if (decoded.exp * 1000 < Date.now()) { 
+        localStorage.removeItem('token');
+        return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const isAuthenticated = isTokenValid();
+  
   useEffect(() => {
     const syncLogout = (event) => {
       if (event.key === 'token' && event.newValue === null) {
@@ -39,13 +55,13 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         
-        {/* Chỉ cần có Token là được vào khung giao diện chính */}
-        <Route path="/" element={token ? <MainLayout /> : <Navigate to="/login" />}>
+        {/* Có Token => Vào khung giao diện chính */}
+        <Route path="/" element={isAuthenticated ? <MainLayout /> : <Navigate to="/login" />}>
           <Route index element={<Dashboard />} />
           <Route path='search' element={<SearchPage/>}/>
           <Route path="database" element={<IocManagement/>} />
 
-          {/* Kiểm tra Role từ Token: Nếu là Admin mới cho vào, không thì đá về Dashboard */}
+          {/* Kiểm tra Role từ Token */}
           <Route 
             path="users" 
             element={role === 'Admin' ? <UsersManagement /> : <Navigate to='/'/>} 

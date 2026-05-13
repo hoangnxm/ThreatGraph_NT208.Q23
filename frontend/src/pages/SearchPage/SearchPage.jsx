@@ -119,9 +119,11 @@ function SearchPage(){
       if (newNodes.length === 0) {
         alert("Node này đã hiển thị hết toàn bộ dữ liệu liên quan!");
         // Nếu click mở rộng mà server trả về rỗng, tắt luôn huy hiệu dấu +
-        setGraphData(prev => ({
-           ...prev,
-           nodes: prev.nodes.map(n => n.id === node.id ? { ...n, isExpandable: false } : n)
+        setGraphData(prevData => ({
+          nodes: prevData.nodes.map(n => 
+            n.id === node.id ? { ...n, isFullyExpanded: true } : n
+          ),
+          links: prevData.links
         }));
         return;
       }

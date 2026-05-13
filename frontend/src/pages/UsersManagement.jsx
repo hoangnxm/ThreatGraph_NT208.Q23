@@ -130,7 +130,14 @@ const UsersManagement = () => {
                         <input 
                             required placeholder="Username" 
                             value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})}
-                            style={{ flex: 1, padding: '10px', borderRadius: '6px', backgroundColor: '#0f172a', color: '#fff', border: '1px solid #475569' }} 
+                            disabled={isEditing}
+                            style={{ 
+                                flex: 1, padding: '10px', borderRadius: '6px', 
+                                backgroundColor: isEditing ? '#334155' : '#0f172a',
+                                color: isEditing ? '#94a3b8' : '#fff', 
+                                border: '1px solid #475569',
+                                cursor: isEditing ? 'not-allowed' : 'text'
+                            }} 
                         />
                         <input 
                             type="password" placeholder={isEditing ? "(Bỏ trống để giữ pass cũ)" : "Mật khẩu (bắt buộc)"} 

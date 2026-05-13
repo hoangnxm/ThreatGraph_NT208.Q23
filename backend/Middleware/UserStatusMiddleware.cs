@@ -38,7 +38,7 @@ namespace NT208_Project.Middlewares
                         return;
                     }
 
-                    string dbSessionToken = (string)user.sessionToken;
+                    string dbSessionToken = user.sessionToken != null ? (string)user.sessionToken : "";
 
                     if (!string.IsNullOrEmpty(dbSessionToken) && dbSessionToken != jwtSessionToken)
                     {

@@ -110,19 +110,18 @@ namespace NT208_Project.Controllers
                 var bindVars = new Dictionary<string, object>
             {
                 { "key", key },
-                { "username", updateData.username },
                 { "role", string.IsNullOrEmpty(updateData.role) ? "User" : updateData.role },
                 { "isLocked", updateData.isLocked ?? false }
             };
 
                 if (!string.IsNullOrWhiteSpace(updateData.password))
                 {
-                    updateQuery = "UPDATE @key WITH { username: @username, password: @password, role: @role, isLocked: @isLocked } IN Users";
+                    updateQuery = "UPDATE @key WITH { password: @password, role: @role, isLocked: @isLocked } IN Users";
                     bindVars.Add("password", BCrypt.Net.BCrypt.HashPassword(updateData.password));
                 }
                 else
                 {
-                    updateQuery = "UPDATE @key WITH { username: @username, role: @role, isLocked: @isLocked } IN Users";
+                    updateQuery = "UPDATE @key WITH {role: @role, isLocked: @isLocked } IN Users";
                 }
 
                 await _db.Cursor.PostCursorAsync<object>(new PostCursorBody
@@ -160,7 +159,7 @@ namespace NT208_Project.Controllers
 
                 if (userToDelete.username == currentUsername)
                 {
-                    return BadRequest(new { message = "Lỗi: Bạn không thể tự sát (xóa tài khoản của chính mình) được!" });
+                    return BadRequest(new { message = "Lỗi: Bạn không thể tự xóa tài khoản của chính mình) được!" });
                 }
 
                 await _db.Cursor.PostCursorAsync<object>(new PostCursorBody
