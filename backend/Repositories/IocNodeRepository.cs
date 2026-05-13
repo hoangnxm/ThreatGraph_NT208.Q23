@@ -102,11 +102,10 @@ namespace backend.Repositories
         // Thêm 2 hàm này vào bên trong class IocNodeRepository
         public async Task BulkUpsertNodesAsync(List<IocNode> nodes)
         {
-            // CỐ ĐỊNH CHUẨN: Dùng _key (đã được hash trên RAM) để kiểm tra tồn tại.
-            // Lưu ý: Trong C#, thuộc tính là Key, nhưng khi parse xuống ArangoDB nó thường được hiểu là _key
+            // Đã đổi doc.Key thành doc._key
             var query = @"
         FOR doc IN @nodes
-        UPSERT { _key: doc.Key } 
+        UPSERT { _key: doc._key } 
         INSERT doc
         UPDATE { RiskScore: doc.RiskScore, UpdatedAt: DATE_NOW() } IN @@collection
     ";
