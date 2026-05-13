@@ -82,7 +82,7 @@ namespace IocNodes.Services
         {
             var client = _httpClientFactory.CreateClient("AlienVaultClient");
             int totalAdded = 0;
-            string currentUrl = "pulses/subscribed?limit=20"; // Limit vừa phải để không nghẽn mạng
+            string currentUrl = "pulses/subscribed?limit=15"; // Đã đổi về 15 theo ý em
 
             try
             {
@@ -91,8 +91,9 @@ namespace IocNodes.Services
                     var response = await client.GetFromJsonAsync<OtxPulseResponse>(currentUrl);
                     if (response?.Results == null || !response.Results.Any()) break;
 
-                    var nodesToUpsert = new List<IocNode>();
-                    var edgesToInsert = new List<dynamic>();
+                    // SỬ DỤNG DICTIONARY ĐỂ TỰ ĐỘNG LỌC TRÙNG DỮ LIỆU TRÊN RAM
+                    var nodesDict = new Dictionary<string, IocNode>();
+                    var edgesDict = new Dictionary<string, object>();
 
                     foreach (var pulse in response.Results)
                     {
@@ -100,7 +101,8 @@ namespace IocNodes.Services
                         string campaignKey = GenerateDeterministicKey(campaignIdStr);
                         string pulseName = string.IsNullOrWhiteSpace(pulse.Name) ? campaignIdStr : pulse.Name;
 
-                        nodesToUpsert.Add(new IocNode
+                        // 1. Thêm Campaign Node vào Dictionary (nếu trùng key tự đè)
+                        nodesDict[campaignKey] = new IocNode
                         {
                             Key = campaignKey,
                             Type = "Campaign",
@@ -108,7 +110,7 @@ namespace IocNodes.Services
                             RiskScore = 90,
                             OriginRef = "AlienVault OTX",
                             Tags = new List<string> { "Pulse" }
-                        });
+                        };
 
                         string? previousIocKey = null;
                         string? firstIocKey = null;
@@ -122,57 +124,77 @@ namespace IocNodes.Services
                             string iocKey = GenerateDeterministicKey(cleanValue);
                             int dynamicScore = CalculateDynamicRiskScore(pulse, ind);
 
-                            nodesToUpsert.Add(new IocNode
+                            // 2. Thêm IOC Node vào Dictionary
+                            if (!nodesDict.ContainsKey(iocKey))
                             {
-                                Key = iocKey,
-                                Type = mappedType,
-                                Value = cleanValue,
-                                RiskScore = dynamicScore,
-                                OriginRef = "AlienVault OTX",
-                                Tags = new List<string> { "OTX", "AutoSync" }
-                            });
+                                nodesDict[iocKey] = new IocNode
+                                {
+                                    Key = iocKey,
+                                    Type = mappedType,
+                                    Value = cleanValue,
+                                    RiskScore = dynamicScore,
+                                    OriginRef = "AlienVault OTX",
+                                    Tags = new List<string> { "OTX", "AutoSync" }
+                                };
+                            }
+                            else
+                            {
+                                // Nếu trùng (cùng 1 IP trong nhiều pulse), lấy RiskScore cao hơn
+                                nodesDict[iocKey].RiskScore = Math.Max(nodesDict[iocKey].RiskScore, dynamicScore);
+                            }
 
-                            edgesToInsert.Add(new
+                            // 3. Thêm Edge Belongs_to (tạo chuỗi Hash làm Key lọc trùng cho Edge)
+                            string belongsToEdgeKey = $"{iocKey}_belongs_to_{campaignKey}";
+                            edgesDict[belongsToEdgeKey] = new
                             {
                                 _from = $"IocNodes/{iocKey}",
                                 _to = $"IocNodes/{campaignKey}",
                                 RelationType = "belongs_to",
                                 OriginRef = "AlienVault AutoSync"
-                            });
+                            };
 
+                            // 4. Thêm Edge Related_ioc (Ring Topology)
                             if (!string.IsNullOrEmpty(previousIocKey) && iocKey != previousIocKey)
                             {
-                                edgesToInsert.Add(new { _from = $"IocNodes/{iocKey}", _to = $"IocNodes/{previousIocKey}", RelationType = "related_ioc" });
+                                string relatedEdgeKey = $"{iocKey}_related_ioc_{previousIocKey}";
+                                edgesDict[relatedEdgeKey] = new
+                                {
+                                    _from = $"IocNodes/{iocKey}",
+                                    _to = $"IocNodes/{previousIocKey}",
+                                    RelationType = "related_ioc"
+                                };
                             }
                             if (firstIocKey == null) firstIocKey = iocKey;
                             previousIocKey = iocKey;
 
-                            // Đẩy xuống DB mỗi khi gom đủ 2000 dòng để giải phóng RAM
-                            if (nodesToUpsert.Count >= 2000)
+                            // KIỂM TRA CHUNKING (2000)
+                            if (nodesDict.Count >= 2000)
                             {
-                                await _iocRepo.BulkUpsertNodesAsync(nodesToUpsert);
-                                await _iocRepo.BulkInsertEdgesAsync(edgesToInsert);
-                                totalAdded += nodesToUpsert.Count;
-                                nodesToUpsert.Clear();
-                                edgesToInsert.Clear();
+                                // Chuyển Dictionary.Values thành List để truyền xuống DB
+                                await _iocRepo.BulkUpsertNodesAsync(nodesDict.Values.ToList());
+                                await _iocRepo.BulkInsertEdgesAsync(edgesDict.Values.ToList());
+                                totalAdded += nodesDict.Count;
+
+                                nodesDict.Clear();
+                                edgesDict.Clear();
                             }
                         }
 
                         if (!string.IsNullOrEmpty(previousIocKey) && !string.IsNullOrEmpty(firstIocKey) && previousIocKey != firstIocKey)
                         {
-                            edgesToInsert.Add(new { _from = $"IocNodes/{previousIocKey}", _to = $"IocNodes/{firstIocKey}", RelationType = "related_ioc" });
+                            string closeRingKey = $"{previousIocKey}_related_ioc_{firstIocKey}";
+                            edgesDict[closeRingKey] = new { _from = $"IocNodes/{previousIocKey}", _to = $"IocNodes/{firstIocKey}", RelationType = "related_ioc" };
                         }
                     }
 
                     // Đẩy nốt phần dư trước khi qua trang kế
-                    if (nodesToUpsert.Any())
+                    if (nodesDict.Any())
                     {
-                        await _iocRepo.BulkUpsertNodesAsync(nodesToUpsert);
-                        await _iocRepo.BulkInsertEdgesAsync(edgesToInsert);
-                        totalAdded += nodesToUpsert.Count;
+                        await _iocRepo.BulkUpsertNodesAsync(nodesDict.Values.ToList());
+                        await _iocRepo.BulkInsertEdgesAsync(edgesDict.Values.ToList());
+                        totalAdded += nodesDict.Count;
                     }
 
-                    // Gán URL trang tiếp theo để lặp
                     currentUrl = response.Next;
                 }
             }
