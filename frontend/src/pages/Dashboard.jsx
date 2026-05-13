@@ -8,7 +8,6 @@ import { jwtDecode } from 'jwt-decode';
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 const Dashboard = () => {
-    // 1. Đổi topIps thành topIocs
     const [stats, setStats] = useState({ 
         totalUsers: 0, totalLogs: 0, totalIocs: 0, iocsToday: 0, totalEdges: 0, topIocs: [] 
     });
@@ -27,7 +26,7 @@ const Dashboard = () => {
             try {
                 const res = await axiosClient.get('/Dashboard/stats');
                 
-                // 2. Nhận dữ liệu TopIocs từ API
+                // Đã sửa lại phần gán dữ liệu để tránh lỗi do API trả về sai định dạng
                 setStats({
                     totalUsers: res.data.totalUsers ?? res.data.TotalUsers ?? 0,
                     totalLogs: res.data.totalLogs ?? res.data.TotalLogs ?? 0,
@@ -61,12 +60,14 @@ const Dashboard = () => {
         fetchData();
     }, []);
 
-    const getTypeColor = (type) => {
+// Hàm để xác định màu sắc dựa trên loại IOC
+const getTypeColor = (type) => {
         if (type === 'IP') return '#ef4444';
         if (type === 'Domain') return '#3b82f6';
-        return '#f59e0b'; // Hash
+        return '#f59e0b'; 
     };
-
+    
+    
     return (
         <div style={{ color: '#fff', padding: '20px' }}>
             <h2>HỆ THỐNG GIÁM SÁT IOC</h2>
@@ -82,7 +83,7 @@ const Dashboard = () => {
                 <div style={userCardStyle}>Edges: {stats.totalEdges}</div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '30px', marginTop: '30px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginTop: '30px' }}>
                 <div style={chartBoxStyle}>
                     <h3>Tỉ lệ mã độc</h3>
                     <div style={{ height: '250px' }}>
@@ -91,7 +92,6 @@ const Dashboard = () => {
                 </div>
 
                 <div style={chartBoxStyle}>
-                    {/* 3. Đổi tên và cấu trúc bảng Xếp hạng */}
                     <h3>Bảng Xếp Hạng IOC (Top 10)</h3>
                     <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
                         <thead>
@@ -140,3 +140,5 @@ const Dashboard = () => {
 const adminCardStyle = { background: '#1e293b', padding: '20px', borderRadius: '10px', flex: 1, borderLeft: '5px solid #3b82f6' };
 const userCardStyle = { background: '#0f172a', padding: '30px', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', border: '1px solid #334155' };
 const chartBoxStyle = { background: '#0f172a', padding: '20px', borderRadius: '15px' };
+
+export default Dashboard;
