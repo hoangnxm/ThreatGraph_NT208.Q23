@@ -11,24 +11,15 @@ function SearchPage(){
   const [isLoading, setIsLoading] = useState(false);
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [isExporting, setIsExporting] = useState(false);
-  
   const [selectedNode, setSelectedNode] = useState(null);
-  
-  // TÍNH NĂNG MỚI 1: State để theo dõi chuột đang chỉ vào Node nào (để hiện chữ)
   const [hoverNode, setHoverNode] = useState(null);
 
-  // Sổ tay đếm số lần mở rộng
   const expandStatsRef = useRef({});
-  
-  // TÍNH NĂNG MỚI 2: Tạo cần gạt điều khiển động cơ vật lý của ForceGraph
   const fgRef = useRef();
 
-  // Động cơ vật lý: Tự động chạy lại mỗi khi graphData thay đổi (kéo thêm node)
   useEffect(() => {
     if (fgRef.current) {
-      // Tăng lực đẩy từ -400 lên -800 để tụi nó né nhau ra xa hơn
       fgRef.current.d3Force('charge').strength(-800);
-      // Nới khoảng cách dây nối ra một chút
       fgRef.current.d3Force('link').distance(150);
       fgRef.current.d3ReheatSimulation();
     }
@@ -82,7 +73,9 @@ function SearchPage(){
                  name: n.name || n.Name || n.NAME || "Unknown",
                  type: type,
                  val: Number(n.val || n.Val || n.VAL) || 5,
-                 color: color
+                 color: color,
+                 // Đọc cờ isExpandable từ Backend
+                 isExpandable: n.isExpandable || false 
               });
            }
         });
@@ -97,7 +90,6 @@ function SearchPage(){
 
         setGraphData({ nodes: safeNodes, links: safeLinks });
 
-        // ĐÃ FIX BỆNH "TUA LẠI PHIM CŨ": Báo cho sổ tay biết tâm điểm đã load sẵn 50 node
         expandStatsRef.current = {}; 
         expandStatsRef.current[searchKey] = 50; 
       }
@@ -126,15 +118,22 @@ function SearchPage(){
 
       if (newNodes.length === 0) {
         alert("Node này đã hiển thị hết toàn bộ dữ liệu liên quan!");
+        // Nếu click mở rộng mà server trả về rỗng, tắt luôn huy hiệu dấu +
+        setGraphData(prev => ({
+           ...prev,
+           nodes: prev.nodes.map(n => n.id === node.id ? { ...n, isExpandable: false } : n)
+        }));
         return;
       }
 
-      // ĐÃ SỬA: Đổi số lượng thành 20 để đồng bộ với Backend
       expandStatsRef.current[nodeKey] = currentSkip + 20;
 
       setGraphData(prevData => {
         const existingNodeIds = new Set(prevData.nodes.map(n => n.id));
         
+        // Cập nhật lại Node vừa click xem nó còn khả năng Expand không dựa theo data mới trả về
+        // Server trả về danh sách newNodes không chứa Node gốc (bởi vì ta mở rộng TỪ nó ra), 
+        // Do đó ta vẫn giữ nguyên logic cũ, chỉ thêm cờ isExpandable cho Node mới
         const uniqueNewNodes = newNodes
           .filter(n => n.id && !existingNodeIds.has(n.id))
           .map(n => {
@@ -146,7 +145,7 @@ function SearchPage(){
               name: n.name || "Unknown",
               val: Number(n.val) || 5,
               color: color,
-              // ĐÃ FIX BỆNH "NÚT TÀNG HÌNH": Tăng độ nảy toạ độ ngẫu nhiên từ 20 lên 50 để các node văng ra xa nhau
+              isExpandable: n.isExpandable || false,
               x: node.x + (Math.random() - 0.5) * 50, 
               y: node.y + (Math.random() - 0.5) * 50 
             };
@@ -248,6 +247,7 @@ function SearchPage(){
 
           <div className="graph-panel" style={{ overflow: 'hidden', position: 'relative' }}>
              
+             {/* Cập nhật Legend (Chú giải) */}
              <div style={{ position: 'absolute', top: 15, left: 15, background: 'rgba(22, 27, 34, 0.8)', padding: '10px 15px', borderRadius: 8, border: '1px solid #30363d', fontSize: 13, zIndex: 10, textAlign: 'left' }}>
                 <div style={{fontWeight: 'bold', marginBottom: 8, color: '#c9d1d9'}}>Mức độ rủi ro (Risk)</div>
                 <div style={{color: '#a371f7', marginBottom: 4}}>🟣 Tâm điểm tra cứu</div>
@@ -255,7 +255,8 @@ function SearchPage(){
                 <div style={{color: '#ff7b72', marginBottom: 4}}>🔴 Cao (&ge; 80)</div>
                 <div style={{color: '#d29922', marginBottom: 4}}>🟡 Cảnh báo (&ge; 50)</div>
                 <div style={{color: '#238636', marginBottom: 8}}>🟢 An toàn (&lt; 50)</div>
-                <div style={{borderTop: '1px dashed #555', paddingTop: 8, color: '#ffeb3b', fontStyle: 'italic'}}>🖱️ Click chuột phải vào Node<br/>để mở rộng bản đồ</div>
+                <div style={{borderTop: '1px dashed #555', paddingTop: 8, color: '#10b981', fontWeight: 'bold'}}>🟢[+] Có thể mở rộng</div>
+                <div style={{color: '#ffeb3b', fontStyle: 'italic', marginTop: 4}}>🖱️ Click chuột phải để mở</div>
              </div>
 
              {selectedNode && (
@@ -283,15 +284,14 @@ function SearchPage(){
                   linkDirectionalArrowRelPos={1}
                   onNodeClick={(node) => setSelectedNode(node)} 
                   onNodeRightClick={handleNodeRightClick} 
-                  
                   onNodeHover={node => setHoverNode(node)}
-
                   nodeCanvasObject={(node, ctx, globalScale) => {
                     try {
                       const x = node.x || 0; 
                       const y = node.y || 0; 
                       const radius = node.val + 2;
                       
+                      // 1. Vẽ Node (Hình tròn chính)
                       ctx.beginPath(); 
                       ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
                       ctx.fillStyle = node.color; 
@@ -300,6 +300,7 @@ function SearchPage(){
                       ctx.strokeStyle = '#ffffff'; 
                       ctx.stroke();
 
+                      // 2. Viền Xanh khi User chọn Node
                       if (selectedNode && selectedNode.id === node.id) {
                           ctx.beginPath(); 
                           ctx.arc(x, y, radius + 3, 0, 2 * Math.PI, false);
@@ -308,6 +309,32 @@ function SearchPage(){
                           ctx.stroke();
                       }
 
+                      // 3. VẼ HUY HIỆU DẤU CỘNG NẾU CÓ THỂ MỞ RỘNG (Visual Affordance)
+                      if (node.isExpandable) {
+                          const badgeRadius = 3.5; // Bán kính cục huy hiệu
+                          // Đặt góc 45 độ (phía dưới bên phải của Node)
+                          const badgeX = x + radius * Math.cos(Math.PI / 4);
+                          const badgeY = y + radius * Math.sin(Math.PI / 4);
+
+                          // Vẽ nền huy hiệu màu xanh
+                          ctx.beginPath();
+                          ctx.arc(badgeX, badgeY, badgeRadius, 0, 2 * Math.PI, false);
+                          ctx.fillStyle = '#10b981'; // Xanh lá cây (Tailwind emerald-500)
+                          ctx.fill();
+                          ctx.strokeStyle = '#0f172a'; // Viền đen để tách biệt
+                          ctx.lineWidth = 0.5;
+                          ctx.stroke();
+
+                          // Vẽ dấu cộng (+) màu trắng ở giữa
+                          ctx.fillStyle = '#ffffff';
+                          ctx.font = 'bold 7px Sans-Serif';
+                          ctx.textAlign = 'center';
+                          ctx.textBaseline = 'middle';
+                          // Thêm 0.5 vào Y để chữ canh giữa hoàn hảo hơn
+                          ctx.fillText('+', badgeX, badgeY + 0.5); 
+                      }
+
+                      // 4. Vẽ Text hiển thị khi Hover, Click hoặc Zoom to
                       const isHovered = hoverNode && hoverNode.id === node.id;
                       const isSelected = selectedNode && selectedNode.id === node.id;
                       const isZoomedIn = globalScale > 2.5;

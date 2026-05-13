@@ -21,9 +21,6 @@ namespace NT208_Project.Controllers
             _dbClient = dbClient;
         }
 
-        // GET: api/Graph/{nodeKey}
-        // Gọi lần đầu khi user bấm nút "Truy vết" (Chỉ load 1 tầng)
-        // GET: api/Graph/{nodeKey}
         [HttpGet("{nodeKey}")]
         public async Task<IActionResult> GetThreatGraph(string nodeKey)
         {
@@ -32,14 +29,8 @@ namespace NT208_Project.Controllers
                 string query = @"
                     LET startNodeId = CONCAT('IocNodes/', @nodeKey)
                     
-                    // 1. Dùng Tâm điểm tìm xem nó nằm trong những Campaign nào
-                    LET campaigns = (
-                        FOR v IN 1..1 ANY startNodeId IocRelationships
-                        FILTER v.Type == 'Campaign'
-                        RETURN v._id
-                    )
+                    LET campaigns = (FOR v IN 1..1 ANY startNodeId IocRelationships FILTER v.Type == 'Campaign' RETURN v._id)
                     
-                    // 2. Từ các Campaign đó, lôi tất cả các anh em (siblings) của Tâm điểm ra
                     LET siblings = (
                         FOR campId IN campaigns
                             FOR v IN 1..1 ANY campId IocRelationships
@@ -48,21 +39,25 @@ namespace NT208_Project.Controllers
                             RETURN v
                     )
                     
-                    // 3. Lấy thêm hàng xóm cắm trực tiếp vào Tâm điểm (nếu có)
-                    LET directNeighbors = (
-                        FOR v IN 1..1 ANY startNodeId IocRelationships
-                        FILTER v.Type != 'Campaign'
-                        RETURN v
-                    )
+                    LET directNeighbors = (FOR v IN 1..1 ANY startNodeId IocRelationships FILTER v.Type != 'Campaign' RETURN v)
                     
                     LET allNodes = UNIQUE(APPEND(siblings, directNeighbors))
                     
-                    // 4. Xử lý thuật toán Lão hóa (Decay)
+                    // Lấy danh sách ID của tất cả Node sẽ hiển thị để làm mốc so sánh
+                    LET allVisibleIds = APPEND(allNodes[*]._id, [startNodeId])
+                    
                     LET nodes = (
                         FOR v IN allNodes 
                         LET daysOld = HAS(v, 'CreatedAt') ? DATE_DIFF(v.CreatedAt, DATE_NOW(), 'day') : 0
                         LET decayAmount = FLOOR(daysOld / 7) * 5
                         LET dynamicScore = MAX([0, v.RiskScore - decayAmount])
+                        
+                        // Kiểm tra xem Node này có Edge nào nối ra 'người lạ' (không nằm trong allVisibleIds) hay không
+                        LET hiddenEdges = (
+                            FOR e IN IocRelationships
+                            FILTER (e._from == v._id AND e._to NOT IN allVisibleIds) OR (e._to == v._id AND e._from NOT IN allVisibleIds)
+                            LIMIT 1 RETURN 1
+                        )
                         
                         RETURN DISTINCT {
                             id: v._id,
@@ -70,40 +65,25 @@ namespace NT208_Project.Controllers
                             type: v.Type,
                             val: (dynamicScore / 10) + 1, 
                             color: dynamicScore >= 80 ? '#ff7b72' : (dynamicScore >= 50 ? '#d29922' : '#238636'),
-                            actualRiskScore: dynamicScore
+                            actualRiskScore: dynamicScore,
+                            isExpandable: LENGTH(hiddenEdges) > 0 // Trả về true nếu còn lấp ló Edge ẩn
                         }
                     )
                     
-                    LET allVisibleIds = APPEND(allNodes[*]._id, [startNodeId])
-                    
-                    // 5. Tơ Ngang (Links chéo giữa các Node)
-                    LET realLinks = (
-                        FOR e IN IocRelationships
-                        FILTER e._from IN allVisibleIds AND e._to IN allVisibleIds AND e.RelationType != 'belongs_to'
-                        RETURN DISTINCT {
-                            source: e._from,
-                            target: e._to,
-                            name: e.RelationType
-                        }
-                    )
-                    
-                    // 5.2 Tơ Dọc ẢO (Nối từ tâm điểm ra anh em)
-                    LET virtualLinks = (
-                        FOR n IN allNodes
-                        RETURN {
-                            source: startNodeId,
-                            target: n._id,
-                            name: 'shared_campaign'
-                        }
-                    )
-                    
+                    LET realLinks = (FOR e IN IocRelationships FILTER e._from IN allVisibleIds AND e._to IN allVisibleIds AND e.RelationType != 'belongs_to' RETURN DISTINCT { source: e._from, target: e._to, name: e.RelationType })
+                    LET virtualLinks = (FOR n IN allNodes RETURN { source: startNodeId, target: n._id, name: 'shared_campaign' })
                     LET links = UNIQUE(APPEND(realLinks, virtualLinks))
                     
-                    // 6. Xử lý Tâm Điểm
                     LET rootNode = DOCUMENT(startNodeId)
                     LET rootDaysOld = HAS(rootNode, 'CreatedAt') ? DATE_DIFF(rootNode.CreatedAt, DATE_NOW(), 'day') : 0
-                    LET rootDecay = FLOOR(rootDaysOld / 7) * 5
-                    LET rootScore = MAX([0, rootNode.RiskScore - rootDecay])
+                    LET rootScore = MAX([0, rootNode.RiskScore - (FLOOR(rootDaysOld / 7) * 5)])
+                    
+                    // Kiểm tra riêng cho Tâm Điểm
+                    LET rootHiddenEdges = (
+                        FOR e IN IocRelationships
+                        FILTER (e._from == rootNode._id AND e._to NOT IN allVisibleIds) OR (e._to == rootNode._id AND e._from NOT IN allVisibleIds)
+                        LIMIT 1 RETURN 1
+                    )
                     
                     LET rootNodeFormatted = { 
                         id: rootNode._id, 
@@ -111,33 +91,22 @@ namespace NT208_Project.Controllers
                         type: rootNode.Type, 
                         val: (rootScore / 10) + 3,
                         color: '#a371f7',
-                        actualRiskScore: rootScore
+                        actualRiskScore: rootScore,
+                        isExpandable: LENGTH(rootHiddenEdges) > 0
                     }
                     
-                    RETURN { 
-                        nodes: APPEND(nodes, [rootNodeFormatted], true), 
-                        links: links 
-                    }";
+                    RETURN { nodes: APPEND(nodes, [rootNodeFormatted], true), links: links }";
 
                 var bindVars = new Dictionary<string, object> { { "nodeKey", nodeKey } };
-                var response = await _dbClient.Cursor.PostCursorAsync<GraphDataResponse>(
-                    new PostCursorBody { Query = query, BindVars = bindVars }
-                );
-
+                var response = await _dbClient.Cursor.PostCursorAsync<GraphDataResponse>(new PostCursorBody { Query = query, BindVars = bindVars });
                 var graphData = response.Result.FirstOrDefault();
                 if (graphData == null) return NotFound(new { message = "Không tìm thấy dữ liệu mạng nhện!" });
 
                 return Ok(graphData);
             }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Lỗi khi quét Graph", error = ex.Message });
-            }
+            catch (Exception ex) { return StatusCode(500, new { message = "Lỗi khi quét Graph", error = ex.Message }); }
         }
 
-        // GET: api/Graph/expand/{nodeKey}
-        // Gọi khi user Click CHUỘT PHẢI vào 1 node bất kỳ trên màn hình
-      // GET: api/Graph/expand/{nodeKey}
         [HttpGet("expand/{nodeKey}")]
         public async Task<IActionResult> ExpandGraph(string nodeKey, [FromQuery] int skip = 0)
         {
@@ -145,43 +114,24 @@ namespace NT208_Project.Controllers
             {
                 string query = @"
                     LET startNodeId = CONCAT('IocNodes/', @nodeKey)
+                    LET campaigns = (FOR v IN 1..1 ANY startNodeId IocRelationships FILTER v.Type == 'Campaign' RETURN v._id)
+                    LET siblings = (FOR campId IN campaigns FOR v IN 1..1 ANY campId IocRelationships FILTER v.Type != 'Campaign' AND v._id != startNodeId RETURN v)
+                    LET directNeighbors = (FOR v IN 1..1 ANY startNodeId IocRelationships FILTER v.Type != 'Campaign' RETURN v)
                     
-                    // 1. TÌM CHIẾN DỊCH: Lấy tất cả Campaign của node được click
-                    LET campaigns = (
-                        FOR v IN 1..1 ANY startNodeId IocRelationships
-                        FILTER v.Type == 'Campaign'
-                        RETURN v._id
-                    )
-                    
-                    // 2. TÌM ANH EM & HÀNG XÓM (Chưa phân trang)
-                    LET siblings = (
-                        FOR campId IN campaigns
-                            FOR v IN 1..1 ANY campId IocRelationships
-                            FILTER v.Type != 'Campaign' AND v._id != startNodeId
-                            RETURN v
-                    )
-                    
-                    LET directNeighbors = (
-                        FOR v IN 1..1 ANY startNodeId IocRelationships
-                        FILTER v.Type != 'Campaign'
-                        RETURN v
-                    )
-                    
-                    // 3. GỘP LẠI & PHÂN TRANG (Chỉ lấy đúng 20 node mỗi lần click)
                     LET combined = UNIQUE(APPEND(siblings, directNeighbors))
-                    LET allNodes = (
-                        FOR v IN combined
-                        SORT v._id ASC
-                        LIMIT @skip, 20
-                        RETURN v
-                    )
+                    LET allNodes = (FOR v IN combined SORT v._id ASC LIMIT @skip, 20 RETURN v)
+                    LET allVisibleIds = APPEND(allNodes[*]._id, [startNodeId])
                     
-                    // 4. LÃO HÓA (Thuật toán Decay)
                     LET nodes = (
                         FOR v IN allNodes 
                         LET daysOld = HAS(v, 'CreatedAt') ? DATE_DIFF(v.CreatedAt, DATE_NOW(), 'day') : 0
-                        LET decayAmount = FLOOR(daysOld / 7) * 5
-                        LET dynamicScore = MAX([0, v.RiskScore - decayAmount])
+                        LET dynamicScore = MAX([0, v.RiskScore - (FLOOR(daysOld / 7) * 5)])
+                        
+                        LET hiddenEdges = (
+                            FOR e IN IocRelationships
+                            FILTER (e._from == v._id AND e._to NOT IN allVisibleIds) OR (e._to == v._id AND e._from NOT IN allVisibleIds)
+                            LIMIT 1 RETURN 1
+                        )
                         
                         RETURN DISTINCT {
                             id: v._id,
@@ -189,63 +139,27 @@ namespace NT208_Project.Controllers
                             type: v.Type,
                             val: (dynamicScore / 10) + 1, 
                             color: dynamicScore >= 80 ? '#ff7b72' : (dynamicScore >= 50 ? '#d29922' : '#238636'),
-                            actualRiskScore: dynamicScore
+                            actualRiskScore: dynamicScore,
+                            isExpandable: LENGTH(hiddenEdges) > 0
                         }
                     )
                     
-                    LET allVisibleIds = APPEND(allNodes[*]._id, [startNodeId])
+                    LET realLinks = (FOR e IN IocRelationships FILTER e._from IN allVisibleIds AND e._to IN allVisibleIds AND e.RelationType != 'belongs_to' RETURN DISTINCT { source: e._from, target: e._to, name: e.RelationType })
+                    LET virtualLinks = (FOR n IN allNodes RETURN { source: startNodeId, target: n._id, name: 'shared_campaign' })
                     
-                    // 5. TƠ NGANG (Lấy các liên kết chéo vòng tròn giữa các node mới)
-                    LET realLinks = (
-                        FOR e IN IocRelationships
-                        FILTER e._from IN allVisibleIds AND e._to IN allVisibleIds AND e.RelationType != 'belongs_to'
-                        RETURN DISTINCT {
-                            source: e._from,
-                            target: e._to,
-                            name: e.RelationType
-                        }
-                    )
-                    
-                    // 6. TƠ DỌC (Tạo liên kết ảo từ node được click ra các node anh em mới nở)
-                    LET virtualLinks = (
-                        FOR n IN allNodes
-                        RETURN {
-                            source: startNodeId,
-                            target: n._id,
-                            name: 'shared_campaign'
-                        }
-                    )
-                    
-                    LET links = UNIQUE(APPEND(realLinks, virtualLinks))
-                    
-                    // KHÔNG cần trả về Root Node ở đây vì UI đã có sẵn Node đó rồi
-                    RETURN { 
-                        nodes: nodes, 
-                        links: links 
-                    }";
+                    RETURN { nodes: nodes, links: UNIQUE(APPEND(realLinks, virtualLinks)) }";
 
-                var bindVars = new Dictionary<string, object> {
-                    { "nodeKey", nodeKey },
-                    { "skip", skip }
-                };
-
-                var response = await _dbClient.Cursor.PostCursorAsync<GraphDataResponse>(
-                    new PostCursorBody { Query = query, BindVars = bindVars }
-                );
-
+                var bindVars = new Dictionary<string, object> { { "nodeKey", nodeKey }, { "skip", skip } };
+                var response = await _dbClient.Cursor.PostCursorAsync<GraphDataResponse>(new PostCursorBody { Query = query, BindVars = bindVars });
                 var graphData = response.Result.FirstOrDefault();
                 if (graphData == null) return NotFound(new { message = "Không có data!" });
 
                 return Ok(graphData);
             }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Lỗi khi mở rộng Graph", error = ex.Message });
-            }
+            catch (Exception ex) { return StatusCode(500, new { message = "Lỗi khi mở rộng Graph", error = ex.Message }); }
         }
     }
 
-    // Model cho response
     public class GraphDataResponse
     {
         public List<GraphNode> nodes { get; set; } = new List<GraphNode>();
@@ -259,7 +173,10 @@ namespace NT208_Project.Controllers
         public string type { get; set; } = string.Empty;
         public double val { get; set; }
         public string color { get; set; } = string.Empty;
-        public double? actualRiskScore { get; set; } // Bổ sung trường này cho Model C# đỡ báo lỗi
+        public double? actualRiskScore { get; set; }
+
+        // Thêm trường cờ báo hiệu mở rộng
+        public bool isExpandable { get; set; }
     }
 
     public class GraphLink
