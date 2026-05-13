@@ -20,7 +20,7 @@ namespace IocNodes.Controllers
 
         // GET: api/iocnodes?offset=0&limit=50
         [HttpGet]
-        [Authorize(Roles = "Admin")]
+        [Authorize]        
         public async Task<IActionResult> GetAll([FromQuery] int offset = 0, [FromQuery] int limit = 50)
         {
             var result = await _service.GetAllAsync(offset, limit);
@@ -75,7 +75,7 @@ namespace IocNodes.Controllers
 
         // POST: api/iocnodes/relationship
         [HttpPost("relationship")]
-        [Authorize(Roles = "Admin")]
+        [Authorize]
         public async Task<IActionResult> CreateRelationship([FromBody] CreateRelationshipRequest request)
         {
             // Kiểm tra xem Frontend có gửi thiếu trường nào trong DTO không
@@ -166,7 +166,7 @@ namespace IocNodes.Controllers
 
         // Thêm vào IocNodesController.cs
         [HttpDelete("all")]
-        [Authorize(Roles = "Admin")] // Chỉ Admin mới được phép gọi API này
+        [Authorize] // Chỉ Admin mới được phép gọi API này
         public async Task<IActionResult> DeleteAll()
         {
             try

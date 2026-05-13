@@ -29,9 +29,13 @@ namespace NT208_Project.Controllers
             var iocsToday = await _db.Cursor.PostCursorAsync<int>(new PostCursorBody { Query = todayQuery });
 
             // 3. Top 10 IP nguy hiểm nhất
-            string topIpsQuery = "FOR doc IN IocNodes FILTER doc.Type == 'IP' LIMIT 10 RETURN doc";
+            string topIpsQuery = @"
+            FOR doc IN IocNodes 
+            FILTER doc.type == 'IP' OR doc.Type == 'IP' 
+            SORT doc.riskScore DESC, doc.RiskScore DESC 
+            LIMIT 10 
+            RETURN doc";
             var topIps = await _db.Cursor.PostCursorAsync<object>(new PostCursorBody { Query = topIpsQuery });
-
             return Ok(new 
             { 
                 TotalUsers = usersCount.Result.FirstOrDefault(), 

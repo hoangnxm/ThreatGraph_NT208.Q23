@@ -92,7 +92,7 @@ const Dashboard = () => {
                             {stats.topIps.map((ip, i) => (                             
                                 <tr key={i} onClick={() => navigate(`/search?query=${ip.value || ip.Value}`)} style={{ cursor: 'pointer' }}>
                                     <td style={{ color: '#ef4444' }}>{ip.value || ip.Value}</td>
-                                    <td>{ip.source || ip.Source}</td>
+                                    <td>{ip.originRef || ip.OriginRef || 'Unknown'}</td>
                                 </tr>
                             ))}
                         </tbody>
