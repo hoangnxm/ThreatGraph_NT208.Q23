@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using ArangoDBNetStandard;
 using ArangoDBNetStandard.CursorApi.Models;
+using backend.Models;
 
 namespace NT208_Project.Controllers
 {
@@ -24,18 +25,24 @@ namespace NT208_Project.Controllers
             var totalIocs = await _db.Cursor.PostCursorAsync<int>(new PostCursorBody { Query = "RETURN LENGTH(IocNodes)" });
             var totalEdges = await _db.Cursor.PostCursorAsync<int>(new PostCursorBody { Query = "RETURN LENGTH(IocRelationships)" });
             
-            // Lọc IOC thêm vào hôm nay (Giả sử định dạng CreatedAt là ISO8601)
-            string todayQuery = "RETURN LENGTH(FOR doc IN IocNodes FILTER LEFT(doc.CreatedAt, 10) == LEFT(DATE_ISO8601(DATE_NOW()), 10) RETURN doc)";
+            // 2. Lọc IOC thêm vào hôm nay (CreatedAt hoặc createdAt)
+            string todayQuery = @"
+            RETURN LENGTH(
+                FOR doc IN IocNodes 
+                FILTER LEFT(doc.CreatedAt, 10) == LEFT(DATE_ISO8601(DATE_NOW()), 10) 
+                    OR LEFT(doc.createdAt, 10) == LEFT(DATE_ISO8601(DATE_NOW()), 10) 
+                RETURN doc
+            )";
             var iocsToday = await _db.Cursor.PostCursorAsync<int>(new PostCursorBody { Query = todayQuery });
 
-            // 3. Top 10 IP nguy hiểm nhất
+            // 3. Top 10 IP nguy hiểm nhất (điểm rủi ro cao nhất)
             string topIpsQuery = @"
             FOR doc IN IocNodes 
-            FILTER doc.type == 'IP' OR doc.Type == 'IP' 
+            FILTER UPPER(doc.type) == 'IP' OR UPPER(doc.Type) == 'IP' 
             SORT doc.riskScore DESC, doc.RiskScore DESC 
             LIMIT 10 
             RETURN doc";
-            var topIps = await _db.Cursor.PostCursorAsync<object>(new PostCursorBody { Query = topIpsQuery });
+            var topIps = await _db.Cursor.PostCursorAsync<IocNode>(new PostCursorBody { Query = topIpsQuery });
             return Ok(new 
             { 
                 TotalUsers = usersCount.Result.FirstOrDefault(), 

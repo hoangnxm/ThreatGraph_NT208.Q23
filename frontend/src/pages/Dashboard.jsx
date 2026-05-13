@@ -89,12 +89,20 @@ const Dashboard = () => {
                     <table style={{ width: '100%', textAlign: 'left' }}>
                         <thead><tr><th>IP</th><th>Nguồn</th></tr></thead>
                         <tbody>
-                            {stats.topIps.map((ip, i) => (                             
-                                <tr key={i} onClick={() => navigate(`/search?query=${ip.value || ip.Value}`)} style={{ cursor: 'pointer' }}>
-                                    <td style={{ color: '#ef4444' }}>{ip.value || ip.Value}</td>
-                                    <td>{ip.originRef || ip.OriginRef || 'Unknown'}</td>
+                            {stats.topIps && stats.topIps.length > 0 ? (
+                                stats.topIps.map((ip, i) => (                             
+                                    <tr key={i} onClick={() => navigate(`/search?query=${ip.value || ip.Value}`)} style={{ cursor: 'pointer' }}>
+                                        <td style={{ color: '#ef4444' }}>{ip.value || ip.Value}</td>
+                                        <td>{ip.originRef || ip.OriginRef || 'Unknown'}</td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan="2" style={{ textAlign: 'center', color: '#94a3b8' }}>
+                                        Chưa có dữ liệu IP nguy hiểm
+                                    </td>
                                 </tr>
-                            ))}
+                            )}
                         </tbody>
                     </table>
                 </div>
