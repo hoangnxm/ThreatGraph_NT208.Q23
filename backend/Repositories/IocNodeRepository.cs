@@ -102,12 +102,12 @@ namespace backend.Repositories
         // Thêm 2 hàm này vào bên trong class IocNodeRepository
         public async Task BulkUpsertNodesAsync(List<IocNode> nodes)
         {
-            // Đã đổi doc.Key thành doc._key
             var query = @"
         FOR doc IN @nodes
         UPSERT { _key: doc._key } 
         INSERT doc
-        UPDATE { RiskScore: doc.RiskScore, UpdatedAt: DATE_NOW() } IN @@collection
+        // SỬA TẠI ĐÂY: Dùng DATE_ISO8601 để đảm bảo C# không bị crash khi đọc
+        UPDATE { RiskScore: doc.RiskScore, UpdatedAt: DATE_ISO8601(DATE_NOW()) } IN @@collection
     ";
 
             var bindVars = new Dictionary<string, object>
