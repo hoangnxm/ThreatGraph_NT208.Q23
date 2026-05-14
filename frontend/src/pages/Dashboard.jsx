@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
-import ChartDataLabels from 'chartjs-plugin-datalabels'; // Cài thêm plugin này
+import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { jwtDecode } from 'jwt-decode';
 
-// Đăng ký các thành phần của Chart.js và plugin datalabels
 ChartJS.register(ArcElement, Tooltip, Legend, ChartDataLabels);
 
 const Dashboard = () => {
@@ -37,7 +36,7 @@ const Dashboard = () => {
                     topIocs: res.data.topIocs ?? res.data.TopIocs ?? []
                 });
 
-                // Xử lý dữ liệu phân bố loại IOC cho biểu đồ
+                // Xử lý dữ liệu Distribution (tất cả DB) trả về từ Backend
                 const dist = res.data.typeDistribution || res.data.TypeDistribution || [];
                 let ipCount = 0, domainCount = 0, hashCount = 0;
 
@@ -67,15 +66,14 @@ const Dashboard = () => {
         if (type === 'Domain') return '#3b82f6';
         return '#f59e0b'; 
     };
-
-    // Cấu hình cho biểu đồ tròn với plugin datalabels
+    
+    // Cấu hình Option cho Chart.js để hiển thị phần trăm
     const chartOptions = {
         maintainAspectRatio: false,
         plugins: {
-            // Cấu hình datalabels để hiển thị phần trăm trên mỗi phần của biểu đồ
             datalabels: {
                 formatter: (value, ctx) => {
-                    if (value === 0) return '0%'; // Nếu giá trị là 0 thì hiển thị 0%
+                    if (value === 0) return ''; // Không hiện nếu giá trị = 0
                     let sum = 0;
                     let dataArr = ctx.chart.data.datasets[0].data;
                     dataArr.map(data => { sum += data; });
@@ -88,7 +86,7 @@ const Dashboard = () => {
             tooltip: {
                 callbacks: {
                     label: function(context) {
-                        return ` ${context.label}: ${context.raw} IOCs`; // Hover thì hiện số lượng
+                        return ` ${context.label}: ${context.raw} IOCs`;
                     }
                 }
             }
