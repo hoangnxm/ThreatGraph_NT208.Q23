@@ -25,7 +25,7 @@ namespace NT208_Project.Controllers
             string todayQuery = "RETURN LENGTH(FOR doc IN IocNodes FILTER LEFT(doc.CreatedAt, 10) == LEFT(DATE_ISO8601(DATE_NOW()), 10) RETURN doc)";
             var iocsToday = await _db.Cursor.PostCursorAsync<int>(new PostCursorBody { Query = todayQuery });
 
-            // Truy vấn để lấy top 10 IOC có RiskScore cao nhất
+            // Truy vấn để lấy top 10 IOC có điểm rủi ro cao nhất
             string topIocsQuery = @"
                 FOR doc IN IocNodes 
                 SORT doc.RiskScore DESC, doc.riskScore DESC 
@@ -33,6 +33,13 @@ namespace NT208_Project.Controllers
                 RETURN doc";
             var topIocs = await _db.Cursor.PostCursorAsync<IocNode>(new PostCursorBody { Query = topIocsQuery });
             
+            // Truy vấn để lấy phân bố các IOC theo loại
+            string distributionQuery = @"
+                FOR doc IN IocNodes 
+                COLLECT iocType = UPPER(doc.type ? doc.type : doc.Type) WITH COUNT INTO count 
+                RETURN { Type: iocType, Count: count }";
+            var distribution = await _db.Cursor.PostCursorAsync<dynamic>(new PostCursorBody { Query = distributionQuery });
+
             return Ok(new 
             { 
                 TotalUsers = usersCount.Result.FirstOrDefault(), 
@@ -40,7 +47,8 @@ namespace NT208_Project.Controllers
                 TotalIocs = totalIocs.Result.FirstOrDefault(),
                 IocsToday = iocsToday.Result.FirstOrDefault(),
                 TotalEdges = totalEdges.Result.FirstOrDefault(),
-                TopIocs = topIocs.Result // Đổi tên trả về thành TopIocs
+                TopIocs = topIocs.Result,
+                TypeDistribution = distribution.Result
             });
         }
     }

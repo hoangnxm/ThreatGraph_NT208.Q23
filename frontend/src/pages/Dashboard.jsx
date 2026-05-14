@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
+import ChartDataLabels from 'chartjs-plugin-datalabels'; // Cài thêm plugin này
 import { jwtDecode } from 'jwt-decode';
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+// Đăng ký các thành phần của Chart.js và plugin datalabels
+ChartJS.register(ArcElement, Tooltip, Legend, ChartDataLabels);
 
 const Dashboard = () => {
     const [stats, setStats] = useState({ 
@@ -26,7 +28,6 @@ const Dashboard = () => {
             try {
                 const res = await axiosClient.get('/Dashboard/stats');
                 
-                // Đã sửa lại phần gán dữ liệu để tránh lỗi do API trả về sai định dạng
                 setStats({
                     totalUsers: res.data.totalUsers ?? res.data.TotalUsers ?? 0,
                     totalLogs: res.data.totalLogs ?? res.data.TotalLogs ?? 0,
@@ -36,21 +37,22 @@ const Dashboard = () => {
                     topIocs: res.data.topIocs ?? res.data.TopIocs ?? []
                 });
 
-                const iocRes = await axiosClient.get('/iocnodes/paged?limit=1000');
-                const iocList = iocRes.data?.items || [];
-                const counts = { IP: 0, Domain: 0, Hash: 0 };
-                
-                iocList.forEach(i => {
-                    const type = i.type || i.Type;
-                    if (type === 'IP') counts.IP++;
-                    else if (type === 'Domain') counts.Domain++;
-                    else counts.Hash++;
+                // Xử lý dữ liệu phân bố loại IOC cho biểu đồ
+                const dist = res.data.typeDistribution || res.data.TypeDistribution || [];
+                let ipCount = 0, domainCount = 0, hashCount = 0;
+
+                dist.forEach(d => {
+                    const t = d.Type || d.type;
+                    const c = d.Count || d.count;
+                    if (t === 'IP') ipCount = c;
+                    else if (t === 'DOMAIN') domainCount = c;
+                    else if (t === 'HASH') hashCount = c;
                 });
 
                 setChartData({
                     labels: ['IP', 'Domain', 'Hash'],
                     datasets: [{
-                        data: [counts.IP, counts.Domain, counts.Hash],
+                        data: [ipCount, domainCount, hashCount],
                         backgroundColor: ['#ef4444', '#3b82f6', '#f59e0b'],
                         hoverOffset: 20
                     }]
@@ -60,13 +62,38 @@ const Dashboard = () => {
         fetchData();
     }, []);
 
-// Hàm để xác định màu sắc dựa trên loại IOC
-const getTypeColor = (type) => {
+    const getTypeColor = (type) => {
         if (type === 'IP') return '#ef4444';
         if (type === 'Domain') return '#3b82f6';
         return '#f59e0b'; 
     };
-    
+
+    // Cấu hình cho biểu đồ tròn với plugin datalabels
+    const chartOptions = {
+        maintainAspectRatio: false,
+        plugins: {
+            // Cấu hình datalabels để hiển thị phần trăm trên mỗi phần của biểu đồ
+            datalabels: {
+                formatter: (value, ctx) => {
+                    if (value === 0) return '0%'; // Nếu giá trị là 0 thì hiển thị 0%
+                    let sum = 0;
+                    let dataArr = ctx.chart.data.datasets[0].data;
+                    dataArr.map(data => { sum += data; });
+                    let percentage = (value * 100 / sum).toFixed(1) + "%";
+                    return percentage; // Hiện số phần trăm
+                },
+                color: '#fff',
+                font: { weight: 'bold', size: 14 }
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return ` ${context.label}: ${context.raw} IOCs`; // Hover thì hiện số lượng
+                    }
+                }
+            }
+        }
+    };
     
     return (
         <div style={{ color: '#fff', padding: '20px' }}>
@@ -87,7 +114,7 @@ const getTypeColor = (type) => {
                 <div style={chartBoxStyle}>
                     <h3>Tỉ lệ mã độc</h3>
                     <div style={{ height: '250px' }}>
-                        {chartData && <Pie data={chartData} options={{ maintainAspectRatio: false }} />}
+                        {chartData && <Pie data={chartData} options={chartOptions} />}
                     </div>
                 </div>
 
