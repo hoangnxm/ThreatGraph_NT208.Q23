@@ -43,7 +43,6 @@ const IocManagement = () => {
         setInputPage(page);
     }, [page]);
 
-    // 
     const handleInputPageChange = (e) => {
         // Chỉ cho phép nhập số nguyên
         const val = e.target.value.replace(/[^0-9]/g, '');
