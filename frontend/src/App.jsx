@@ -39,6 +39,7 @@ function App() {
     return () => window.removeEventListener('storage', syncLogout);
   }, []);
   const getRoleFromToken = () => {
+    const token = localStorage.getItem('token');
     if (!token) return null;
     try {
       const decoded = jwtDecode(token);
