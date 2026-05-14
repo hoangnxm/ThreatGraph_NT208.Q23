@@ -25,11 +25,11 @@ const Login = () => {
                 localStorage.clear();
                 localStorage.setItem('token', response.data.token);
 
-                navigate('/'); // Redirect về trang Dashboard sau khi đăng nhập thành công
+                window.location.href = '/'; // Redirect về trang Dashboard sau khi đăng nhập thành công
             }
             else {
                 setError('Đăng nhập thất bại! Vui lòng kiểm tra lại thông tin.');
-                navigate('/login'); // Redirect về trang login nếu không có token trả về
+                window.location.href = '/login'; // Redirect về trang login nếu không có token trả về
             }
         } catch (err) {
             if (err.response && err.response.data) {
