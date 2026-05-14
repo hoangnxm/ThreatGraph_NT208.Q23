@@ -30,7 +30,8 @@ const MainLayout = () => {
                     display: 'flex',
                     flexDirection: 'column'
                 }}>
-                    <Outlet context={[searchText]} />
+
+                <Outlet context={[searchText]} />
                 </main>
             </div>
         </div>
